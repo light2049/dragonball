@@ -1,0 +1,40 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./build/DragonBall.exe)",
+      "Bash(echo \"EXIT CODE: $?\")",
+      "Bash(./DragonBall.exe)",
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(start /B D:\\\\DragonBall\\\\build\\\\DragonBall.exe)",
+      "Bash(timeout 2)",
+      "Bash(\"./DragonBall.exe\")",
+      "Bash(powershell *)",
+      "Bash(cmake --build .)",
+      "Bash(cmd.exe /c \"DragonBall.exe\")",
+      "Bash(taskkill //F //IM DragonBall.exe)",
+      "Bash(cat /c/Users/Lenovo/game_log.txt)",
+      "Bash(cat \"D:/DragonBall/build/fighter_log.txt\")",
+      "Bash(cmd.exe /c \"start /B DragonBall.exe\")",
+      "Bash(powershell.exe *)",
+      "Bash(git diff *)",
+      "Bash(diff -ruN . ~/original_backup)",
+      "Bash(rm -f \"C:\\\\Users\\\\Lenovo\\\\game_log.txt\" \"D:\\\\DragonBall\\\\build\\\\fighter_log.txt\")",
+      "Bash(kill %1)",
+      "Bash(cmd.exe /c \"start /wait DragonBall.exe\")",
+      "Bash(cmd *)",
+      "Bash(taskkill /f /im DragonBall.exe)",
+      "Bash(cat \"D:\\\\\\\\DragonBall\\\\\\\\build\\\\\\\\game_log.txt\")",
+      "Bash(cmake --build \"D:/DragonBall/build\")",
+      "Bash(cmake --build . --target DragonBall)",
+      "Bash(cmake --build build)",
+      "Bash(awk -F_ '{print $NF}')",
+      "Bash(sort -t- -k1 -n -k2 -n)",
+      "Bash(C:/Users/Lenovo/AppData/Local/Programs/Python/Python313/python.exe *)",
+      "Bash(git *)",
+      "Bash(sed 's/.*_//')",
+      "Bash(sed 's/\\\\.png//')",
+      "Bash(awk -F'-' '{print $1}')",
+      "Bash(awk '{print $NF, $5, $6, $7, $8}')"
+    ]
+  }
+}

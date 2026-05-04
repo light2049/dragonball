@@ -1,0 +1,19 @@
+[Info]
+name="Vegito_Blue_Kaioken_ULSW"
+displayname="Vegito"
+versiondate=
+mugenversion=1.0
+author="Game Zip"
+pal.defaults=1
+[Files]
+sprite=Vegito_Blue_Kaioken_ULSW.sff
+sound=Vegito_Blue_Kaioken_ULSW.snd
+anim=Vegito_Blue_Kaioken_ULSW.air
+cmd=Vegito_Blue_Kaioken_ULSW.cmd
+cns=Vegito_Blue_Kaioken_ULSW.cns
+st=Vegito_Blue_Kaioken_ULSW.cns
+stcommon=common1.cns
+pal1=Vegito_Blue_Kaioken_ULSW.act
+[Arcade]
+intro.storyboard=
+ending.storyboard=

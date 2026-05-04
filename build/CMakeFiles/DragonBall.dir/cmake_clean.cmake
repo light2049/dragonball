@@ -1,0 +1,37 @@
+file(REMOVE_RECURSE
+  "CMakeFiles/DragonBall.dir/main.cpp.obj"
+  "CMakeFiles/DragonBall.dir/main.cpp.obj.d"
+  "CMakeFiles/DragonBall.dir/src/Characters/AnimationPlayer.cpp.obj"
+  "CMakeFiles/DragonBall.dir/src/Characters/AnimationPlayer.cpp.obj.d"
+  "CMakeFiles/DragonBall.dir/src/Characters/Dummy.cpp.obj"
+  "CMakeFiles/DragonBall.dir/src/Characters/Dummy.cpp.obj.d"
+  "CMakeFiles/DragonBall.dir/src/Characters/Fighter.cpp.obj"
+  "CMakeFiles/DragonBall.dir/src/Characters/Fighter.cpp.obj.d"
+  "CMakeFiles/DragonBall.dir/src/Core/Game.cpp.obj"
+  "CMakeFiles/DragonBall.dir/src/Core/Game.cpp.obj.d"
+  "CMakeFiles/DragonBall.dir/src/Core/InputManager.cpp.obj"
+  "CMakeFiles/DragonBall.dir/src/Core/InputManager.cpp.obj.d"
+  "CMakeFiles/DragonBall.dir/src/Core/ResourceManager.cpp.obj"
+  "CMakeFiles/DragonBall.dir/src/Core/ResourceManager.cpp.obj.d"
+  "CMakeFiles/DragonBall.dir/src/Core/StateRegistry.cpp.obj"
+  "CMakeFiles/DragonBall.dir/src/Core/StateRegistry.cpp.obj.d"
+  "CMakeFiles/DragonBall.dir/src/UI/HUD.cpp.obj"
+  "CMakeFiles/DragonBall.dir/src/UI/HUD.cpp.obj.d"
+  "CMakeFiles/DragonBall.dir/src/Utils/AirParser.cpp.obj"
+  "CMakeFiles/DragonBall.dir/src/Utils/AirParser.cpp.obj.d"
+  "CMakeFiles/DragonBall.dir/src/Utils/CNSController.cpp.obj"
+  "CMakeFiles/DragonBall.dir/src/Utils/CNSController.cpp.obj.d"
+  "CMakeFiles/DragonBall.dir/src/Utils/CmdParser.cpp.obj"
+  "CMakeFiles/DragonBall.dir/src/Utils/CmdParser.cpp.obj.d"
+  "CMakeFiles/DragonBall.dir/src/Utils/CnsParser.cpp.obj"
+  "CMakeFiles/DragonBall.dir/src/Utils/CnsParser.cpp.obj.d"
+  "DragonBall.exe"
+  "DragonBall.exe.manifest"
+  "DragonBall.pdb"
+  "libDragonBall.dll.a"
+)
+
+# Per-language clean rules from dependency scanning.
+foreach(lang CXX)
+  include(CMakeFiles/DragonBall.dir/cmake_clean_${lang}.cmake OPTIONAL)
+endforeach()

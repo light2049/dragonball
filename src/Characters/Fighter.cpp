@@ -1,0 +1,887 @@
+#include "Characters/Fighter.h"
+#include "Core/InputManager.h"
+#include "Utils/CnsParser.h"
+#include <iostream>
+#include <algorithm>
+#include <cmath>
+#include <cstdio>
+
+namespace {
+    void logMsg(const char* msg) {
+        FILE* f = fopen("D:\\DragonBall\\build\\fighter_log.txt", "a");
+        if (f) {
+            fprintf(f, "%s", msg);
+            fclose(f);
+        }
+    }
+}
+
+namespace db {
+    bool Fighter::m_showDebug = true;
+
+    Fighter::Fighter() : m_position(200.f, 480.f), m_velocity(0.f, 0.f), m_isGrounded(true) {
+        m_currentStateNo = 0;
+        m_previousStateNo = -1;
+        m_stateTimer = 0.0f;
+        m_stateType = 0; // S = Standing
+        m_moveType = 0;  // I = Idle
+        m_physicsType = 0; // S = Standing
+        m_isHitOver = true;
+        m_isHitShakeOver = true;
+        m_canRecover = false;
+    }
+
+    void Fighter::loadAnimations(const std::string& airPath, const std::string& basePath, const std::string& prefix) {
+        m_animations = AirParser::parse(airPath, basePath, prefix);
+        std::cout << "[Fighter] Loaded " << m_animations.size() << " animations." << std::endl;
+        switchAnimation(0);
+    }
+
+    void Fighter::loadStats(const std::string& cnsPath) {
+        auto stats = CnsParser::loadStats(cnsPath);
+        m_maxLife = stats.maxLife;
+        m_currentLife = stats.maxLife;
+        m_maxPower = stats.maxPower;     // ✅ 使用解析出的 Power
+        m_currentPower = 0;
+
+        m_pushBack = static_cast<float>(stats.groundBack);
+        m_pushFront = static_cast<float>(stats.groundFront);
+        m_pushHeight = static_cast<float>(stats.height);
+
+        // ✅ 核心修改：加载速度和运动数据
+        m_velData = stats.velocity;
+        m_moveData = stats.movement;
+
+        std::cout << "[Fighter] Stats Loaded -> Life: " << m_maxLife
+                  << ", Gravity: " << (m_moveData.yaccel * 3600.f)
+                  << ", JumpY: " << (m_velData.jumpNeuY * 60.f) << std::endl;
+
+        m_stateRegistry.loadCNS(cnsPath);
+    }
+
+    void Fighter::loadCommonStates(const std::string& commonCnsPath) {
+        m_stateRegistry.loadCNS(commonCnsPath);
+    }
+
+    void Fighter::loadCommands(const std::string& cmdPath) {
+        m_cmdParser.load(cmdPath);
+        // CMD 文件中包含 [Statedef -1] 块, 需要加载到 StateRegistry
+        m_stateRegistry.loadCNS(cmdPath);
+    }
+
+    void Fighter::takeDamage(int damage) {
+        if (isDead()) return;
+        m_currentLife -= damage;
+        if (m_currentLife < 0) m_currentLife = 0;
+    }
+    int Fighter::getCurrentLife() const { return m_currentLife; }
+    int Fighter::getMaxLife() const { return m_maxLife; }
+    bool Fighter::isDead() const { return m_currentLife <= 0; }
+
+    float Fighter::getConstValue(const std::string& path) const {
+        // 解析 const(velocity.xxx) 或 const(movement.xxx) 路径
+        if (path == "velocity.walk.fwd.x")       return m_velData.walkFwd;
+        if (path == "velocity.walk.back.x")      return m_velData.walkBack;
+        if (path == "velocity.jump.y")           return m_velData.jumpNeuY;
+        if (path == "velocity.jump.neu.x")       return m_velData.jumpNeuX;
+        if (path == "velocity.jump.neu.y")       return m_velData.jumpNeuY;
+        if (path == "velocity.jump.fwd.x")       return m_velData.jumpFwd;
+        if (path == "velocity.jump.back.x")      return m_velData.jumpBack;
+        if (path == "velocity.run.fwd.x")        return m_velData.runFwdX;
+        if (path == "velocity.run.fwd.y")        return m_velData.runFwdY;
+        if (path == "velocity.run.back.x")       return m_velData.runBackX;
+        if (path == "velocity.run.back.y")       return m_velData.runBackY;
+        if (path == "velocity.runjump.fwd.x")    return m_velData.runjumpFwd;
+        if (path == "velocity.runjump.back.x")   return m_velData.runjumpBack;
+        if (path == "velocity.airjump.neu.x")    return m_velData.airjumpNeuX;
+        if (path == "velocity.airjump.neu.y")    return m_velData.airjumpNeuY;
+        if (path == "velocity.airjump.fwd.x")    return m_velData.airjumpFwd;
+        if (path == "velocity.airjump.back.x")   return m_velData.airjumpBack;
+        if (path == "movement.yaccel")           return m_moveData.yaccel;
+        if (path == "movement.stand.friction")   return m_moveData.standFriction;
+        if (path == "movement.crouch.friction")  return m_moveData.crouchFriction;
+        if (path == "movement.airjump.num")      return static_cast<float>(m_moveData.airjumpNum);
+        if (path == "movement.airjump.height")   return static_cast<float>(m_moveData.airjumpHeight);
+        if (path == "movement.stand.friction.threshold")  return 0.5f;  // M.U.G.E.N 默认阈值
+        if (path == "movement.crouch.friction.threshold") return 0.5f;
+        return 0.0f;
+    }
+
+    void Fighter::setVelocityX(float x) { m_velocity.x = x; }
+    void Fighter::setVelocityY(float y) { m_velocity.y = y; }
+    float Fighter::getVelocityX() const { return m_velocity.x; }
+    float Fighter::getVelocityY() const { return m_velocity.y; }
+
+    void Fighter::addPositionX(float x) { m_position.x += x; }
+    void Fighter::addPositionY(float y) { m_position.y += y; }
+    sf::Vector2f Fighter::getPosition() const { return m_position; }
+    bool Fighter::isGrounded() const { return m_isGrounded; }
+    bool Fighter::isFacingRight() const { return m_animationPlayer.isFacingRight(); }
+
+    // ✅ 修改：跳跃使用 CNS 配置 (像素/tick * 60 = 像素/秒)
+    // 注意：CNS 中 jump.neu.y = -8.4，负值代表向上，符合 SFML 坐标系
+    void Fighter::performJump() {
+        m_velocity.y = m_velData.jumpNeuY * 60.f;
+    }
+    void Fighter::setFacingRight(bool right) { m_animationPlayer.setFacingRight(right); }
+
+    bool Fighter::isAttacking() const { return m_isAttacking; }
+    void Fighter::setAttacking(bool attacking) {
+        m_isAttacking = attacking;
+        if(attacking) m_hasHitCurrentAttack = false;
+    }
+    bool Fighter::hasHitThisAttack() const { return m_hasHitCurrentAttack; }
+    void Fighter::markAttackAsHit() { m_hasHitCurrentAttack = true; }
+
+    void Fighter::switchAnimation(int animId) {
+        if (m_animations.contains(animId)) {
+            m_animationPlayer.play(m_animations.at(animId));
+            std::string msg = "[Fighter] switchAnimation: " + std::to_string(animId) + " OK\n";
+            logMsg(msg.c_str());
+        } else {
+            std::string msg = "[Fighter] switchAnimation: " + std::to_string(animId) + " NOT FOUND!\n";
+            logMsg(msg.c_str());
+        }
+    }
+
+    void Fighter::requestStateChange(int stateNo) {
+        // 允许引擎级过渡状态 (无条件跳转)
+        bool isEngineState = (stateNo == 0 || stateNo == 10 || stateNo == 11 ||
+                              stateNo == 12 || stateNo == 20 || stateNo == 40 ||
+                              stateNo == 50 || stateNo == 52 ||
+                              stateNo == 100 || stateNo == 105 || stateNo == 106);
+
+        bool hasCnsDef = m_stateRegistry.hasState(stateNo);
+        bool hasAnim = m_animations.contains(stateNo);
+
+        if (!isEngineState && !hasCnsDef && !hasAnim) {
+            std::string msg = "[Fighter] State " + std::to_string(stateNo) + " has neither CNS def nor animation!\n";
+            logMsg(msg.c_str());
+            std::cerr << "[Fighter] State " << stateNo << " has neither CNS def nor animation!\n";
+            return;
+        }
+
+        // DEBUG: log whether we have CNS def for this state
+        {
+            std::string msg = "[Fighter] requestStateChange(" + std::to_string(stateNo)
+                + "): hasCnsDef=" + (hasCnsDef ? "1" : "0")
+                + " hasAnim=" + (hasAnim ? "1" : "0") + "\n";
+            logMsg(msg.c_str());
+        }
+
+        {
+            std::string msg = "[Fighter] State: " + std::to_string(m_currentStateNo) + " -> " + std::to_string(stateNo) + "\n";
+            logMsg(msg.c_str());
+        }
+        m_previousStateNo = m_currentStateNo;
+        m_currentStateNo = stateNo;
+        m_stateTimer = 0.0f;
+        m_hasHitCurrentAttack = false;
+
+        // 应用 CNS StateDef 属性 (type, physics, ctrl, velset, anim, poweradd, movetype)
+        int animBefore = m_animationPlayer.getCurrentAnimId();
+        if (hasCnsDef) {
+            m_stateRegistry.applyStateAttributes(stateNo, *this);
+        } else {
+            // 无 CNS 定义时设置合理的默认属性
+            if (stateNo == 0) {
+                // 待机: Idle 移动类型, 开放控制权
+                setMoveType(0); // I = Idle
+                setControl(true);
+            } else if (stateNo > 0 && stateNo < 200) {
+                // 基础状态 (跳跃、落地等): Idle
+                setMoveType(0);
+                setControl(true);
+            } else if (stateNo >= 200 && stateNo < 1000) {
+                // 攻击类状态: 设为攻击移动类型, 关闭控制权
+                setMoveType(1); // A = Attack
+                setControl(false);
+            } else if (stateNo >= 5000 && stateNo < 6000) {
+                // 受击类状态
+                setMoveType(2); // H = Hit
+                setControl(false);
+            }
+        }
+
+        // 兜底：仅在 applyStateAttributes 未切换动画时，用状态号查找动画
+        if (m_animationPlayer.getCurrentAnimId() == animBefore) {
+            auto it = m_animations.find(stateNo);
+            if (it != m_animations.end()) {
+                switchAnimation(stateNo);
+            }
+        }
+
+        // Debug: log ctrl state after transition
+        {
+            std::string msg = "[Fighter] requestStateChange to " + std::to_string(stateNo)
+                + " done. ctrl=" + std::to_string(m_hasControl)
+                + " moveType=" + std::to_string(m_moveType)
+                + " stateType=" + std::to_string(m_stateType)
+                + " anim=" + std::to_string(m_animationPlayer.getCurrentAnimId()) + "\n";
+            logMsg(msg.c_str());
+        }
+
+        // 引擎级重置: 进入待机/攻击状态时清除命中标志
+        if (m_moveType == 0) { // I = Idle
+            m_hasMoveContact = false;
+            m_hasMoveHit = false;
+            m_hasMoveGuarded = false;
+            m_isAttacking = false;
+        } else if (m_moveType == 1) { // A = Attack
+            m_hasMoveContact = false;
+            m_hasMoveHit = false;
+            m_hasMoveGuarded = false;
+            m_isAttacking = true;
+        }
+    }
+
+    const std::vector<HitDef>& Fighter::getCurrentHitDefs() const {
+        return m_stateRegistry.getHitDefs(m_currentStateNo);
+    }
+
+    // 主更新路径: CNS 驱动, 引擎级基本移动保持硬编码
+    void Fighter::update(float dt, InputManager& inputMgr, const sf::Vector2f& opponentPos) {
+        if (isDead()) return;
+        dt = std::min(dt, 0.05f);
+        m_stateTimer += dt;
+
+        // Diag: print movehit/movecontact flags at start of every frame in state 600
+        if (m_currentStateNo == 600) {
+            static int diagF = 0;
+            if (++diagF % 60 == 1) {
+                FILE* f = fopen("C:\\Users\\Lenovo\\game_log.txt", "a");
+                if (f) {
+                    fprintf(f, "[DiagFlags] hit=%d contact=%d guarded=%d\n",
+                        m_hasMoveHit ? 1 : 0, m_hasMoveContact ? 1 : 0, m_hasMoveGuarded ? 1 : 0);
+                    fclose(f);
+                }
+            }
+        }
+
+        // ==========================================
+        // 1. 物理更新 (基于 statetype)
+        // ==========================================
+        float gravity = 0.f;
+        float friction = 1.f;
+        bool applyGroundCollision = true;
+
+        switch (m_physicsType) {
+            case 0: gravity = m_moveData.yaccel * 3600.f; friction = m_moveData.standFriction; break;
+            case 1: gravity = m_moveData.yaccel * 3600.f; friction = m_moveData.crouchFriction; break;
+            case 2: gravity = m_moveData.yaccel * 3600.f; friction = 1.f; break;
+            case 3: default: gravity = 0.f; friction = 1.f; applyGroundCollision = false; break;
+        }
+
+        m_velocity.y += gravity * dt;
+        m_position += m_velocity * dt;
+
+        if (applyGroundCollision && m_position.y >= GROUND_Y) {
+            m_position.y = GROUND_Y;
+            m_velocity.y = 0;
+            if (!m_isGrounded && m_physicsType == 2) {
+                requestStateChange(52);
+            }
+            m_isGrounded = true;
+        } else if (applyGroundCollision) {
+            m_isGrounded = false;
+        }
+
+        if (m_isGrounded && friction < 1.f) {
+            m_velocity.x *= std::pow(friction, dt * 60.f);
+            if (std::abs(m_velocity.x) < 5.f) m_velocity.x = 0;
+        }
+
+        // Diag: log state 600 pos/vel every ~2s (only in main update path)
+        if (m_currentStateNo == 600) {
+            static int diagCounter600 = 0;
+            if (++diagCounter600 % 120 == 1) {
+                FILE* f = fopen("C:\\Users\\Lenovo\\game_log.txt", "a");
+                if (f) {
+                    fprintf(f, "[Diag600] pos=(%.0f,%.0f) vel=(%.0f,%.0f) dt=%.4f gounded=%d grav=%.0f\n",
+                        m_position.x, m_position.y, m_velocity.x, m_velocity.y, dt, m_isGrounded ? 1 : 0, m_moveData.yaccel * 3600.f);
+                    fclose(f);
+                }
+            }
+        }
+
+        // ==========================================
+        // 2. CMD 指令评估
+        // ==========================================
+        inputMgr.clearCommandResults();  // 清空上一帧缓存，确保 evaluate 读取实时按键
+        m_cmdParser.evaluate(inputMgr);
+        for (const auto& [name, def] : m_cmdParser.getCommands()) {
+            inputMgr.setCommandResult(name, m_cmdParser.isActive(name));
+        }
+
+        // ==========================================
+        // 3. 执行 StateDef -1 (CMD → 状态跳转)
+        // ==========================================
+        m_stateRegistry.executeState(-1, *this, &inputMgr, dt);
+
+        // ==========================================
+        // 4. 引擎级基本移动逻辑 (状态 0/20/40/50/52)
+        // ==========================================
+        bool inputActive = m_hasControl;
+        float distToOpponent = std::abs(opponentPos.x - m_position.x);
+        bool inGuardRange = distToOpponent < 80.f;
+
+        // 方向输入
+        bool fwd = inputMgr.isHeld("holdfwd");
+        bool back = inputMgr.isHeld("holdback");
+        bool up = inputMgr.isHeld("holdup");
+        bool down = inputMgr.isHeld("holddown");
+        bool charge = inputMgr.isHeld("hold_s");
+
+        if (m_currentStateNo == 0 && inputActive) {
+            // 待机 → 跳跃/行走/蹲下/防御/蓄气
+            if (up) { requestStateChange(40); }
+            else if (down) { requestStateChange(10); }
+            else if (fwd || back) {
+                bool holdingBack = (isFacingRight() && back) || (!isFacingRight() && fwd);
+                if (holdingBack && inGuardRange) {
+                    requestStateChange(120);
+                } else {
+                    float walkSpeed = m_velData.walkFwd * 60.f;
+                    m_velocity.x = fwd ? walkSpeed : -walkSpeed;
+                    setFacingRight(fwd);
+                    requestStateChange(20);
+                }
+            }
+            if (charge && m_currentPower < m_maxPower) {
+                requestStateChange(195);
+            }
+        }
+        else if (m_currentStateNo == 20) {
+            // 行走: 跟随方向
+            if (fwd) { m_velocity.x = m_velData.walkFwd * 60.f; setFacingRight(true); }
+            else if (back) { m_velocity.x = m_velData.walkBack * 60.f; setFacingRight(false); }
+            else { requestStateChange(0); }
+        }
+        else if (m_currentStateNo == 40) {
+            // 跳跃起跳: 记录方向, 动画播完后赋予速度
+            if (fwd) m_lastJumpDir = 1;
+            else if (back) m_lastJumpDir = -1;
+            else m_lastJumpDir = 0;
+
+            if (m_stateTimer >= 0.05f) {
+                float vx = 0.f;
+                if (m_lastJumpDir == 1) vx = m_velData.jumpFwd * 60.f;
+                else if (m_lastJumpDir == -1) vx = m_velData.jumpBack * 60.f;
+                setVelocityX(vx);
+                setVelocityY(m_velData.jumpNeuY * 60.f);
+                requestStateChange(50);
+            }
+        }
+        else if (m_currentStateNo == 50) {
+            // 空中: 动画切换 (上升→下降)
+            if (m_velocity.y > -480.f) {
+                int curAnim = m_animationPlayer.getCurrentAnimId();
+                if (curAnim >= 41 && curAnim <= 43) {
+                    int fallAnim = curAnim + 3;
+                    if (m_animations.contains(fallAnim)) switchAnimation(fallAnim);
+                }
+            }
+        }
+        else if (m_currentStateNo == 52) {
+            // 落地缓冲 → 待机
+            if (m_stateTimer > 0.1f) requestStateChange(0);
+        }
+        else if (m_currentStateNo == 11 && inputActive) {
+            // 蹲下 → 起立 (放开↓)
+            if (!down) { requestStateChange(12); }
+            // 蹲下防御
+            else if (back && inGuardRange) { requestStateChange(120); }
+        }
+        else if (m_currentStateNo == 10 && inputActive) {
+            // 站立→蹲下过渡中放开↓ → 取消蹲下
+            if (!down) { requestStateChange(0); }
+        }
+
+        // ==========================================
+        // 5. 执行当前状态的 CNS 控制器
+        // ==========================================
+        m_stateRegistry.executeState(m_currentStateNo, *this, &inputMgr, dt);
+
+        // ==========================================
+        // 6. 更新受击状态标志 (供 GetHitVar 使用)
+        // ==========================================
+        if (m_moveType == 2) { // H = Hit
+            int stateTicks = static_cast<int>(m_stateTimer * 60.f);
+            if (stateTicks >= m_hitInfo.groundHittime) {
+                m_isHitOver = true;
+            }
+        }
+
+        // ==========================================
+        // 7. 自动返回待机 (用于没有 CNS 定义但有动画的状态)
+        // ==========================================
+        if (m_currentStateNo != 0 && !m_stateRegistry.hasState(m_currentStateNo)) {
+            bool shouldReturn = false;
+            if (m_animations.contains(m_currentStateNo)) {
+                // 动画完成一次完整循环后才返回待机
+                if (m_animationPlayer.hasJustLooped()) {
+                    m_animationPlayer.clearLoopFlag();
+                    shouldReturn = true;
+                }
+                // 安全兜底: 超过 60 ticks (1秒) 强制返回
+                int stateTicks = static_cast<int>(m_stateTimer * 60.f);
+                if (stateTicks > 60) {
+                    shouldReturn = true;
+                }
+            } else {
+                // 连动画都没有的状态, 立即返回
+                shouldReturn = true;
+            }
+            if (shouldReturn) {
+                requestStateChange(0);
+            }
+        }
+
+        // ==========================================
+        // 8. 每帧清除命中标志 (让 movehit 只在下帧状态执行前可见)
+        // ==========================================
+        m_hasMoveHit = false;
+
+        // ==========================================
+        // 9. 动画更新
+        // ==========================================
+        m_animationPlayer.update(dt);
+
+        // ==========================================
+        // 10. Explod 每帧更新
+        // ==========================================
+        sf::Vector2f fighterPos = m_position;
+        for (auto& explod : m_explods) {
+            explod.animPlayer.update(dt);
+
+            // 位置更新: bindtime 期间跟随父级
+            if (explod.bindtime != 0) {
+                if (explod.bindtime > 0) explod.bindtime--;
+                // 重算跟随位置 (与 ExplodController 公式一致)
+                float dir = isFacingRight() ? 1.f : -1.f;
+                float cH = m_animationPlayer.getSpriteSize().y;
+                float eH = explod.animPlayer.getSpriteSize().y;
+                sf::Vector2i eOff = explod.animPlayer.getCurrentFrame().offset;
+                explod.currentPos = {
+                    fighterPos.x + explod.pos.x * dir - 2.f * eOff.x,
+                    (fighterPos.y - cH) + explod.pos.y + eH - 2.f * eOff.y
+                };
+                // 更新 facing: 始终跟随父级方向
+                bool parentFacing = isFacingRight();
+                explod.animPlayer.setFacingRight(explod.facing == 1 ? parentFacing : !parentFacing);
+            } else {
+                // 独立后: 按 vel 移动 (px/tick)
+                explod.currentPos.x += explod.vel.x;
+                explod.currentPos.y += explod.vel.y;
+            }
+
+            // 移除判定
+            if (explod.removetime == -2) {
+                // 动画播完后移除
+                if (explod.animPlayer.hasJustLooped()) {
+                    explod.done = true;
+                }
+            } else if (explod.removetime > 0) {
+                explod.removetime--;
+                if (explod.removetime == 0) explod.done = true;
+            }
+        }
+        m_explods.erase(std::remove_if(m_explods.begin(), m_explods.end(),
+            [](const ExplodInstance& e) { return e.done; }), m_explods.end());
+
+        // ==========================================
+        // 11. 画面震动递减
+        // ==========================================
+        if (m_shakeTime > 0) {
+            m_shakeTime--;
+            if (m_shakeTime <= 0) m_shakeAmpl = 0;
+        }
+
+        // ==========================================
+        // 12. AfterImage 快照捕获
+        // ==========================================
+        if (m_afterImageActive) {
+            m_afterImageTime--;
+            if (m_afterImageTime <= 0) {
+                m_afterImageActive = false;
+                m_afterImageGhosts.clear();
+            } else {
+                m_afterImageCaptureTimer++;
+                if (m_afterImageCaptureTimer >= m_afterImageTimegap) {
+                    m_afterImageCaptureTimer = 0;
+
+                    // 克隆当前精灵状态
+                    AfterImageGhost ghost;
+                    auto cloned = m_animationPlayer.cloneSprite();
+                    if (cloned.has_value()) {
+                        ghost.sprite = std::make_unique<sf::Sprite>(std::move(cloned.value()));
+                    }
+                    ghost.position = m_position;
+
+                    // 计算 frame offset 和 sprite height（与 draw 逻辑一致）
+                    const AnimFrame& frame = m_animationPlayer.getCurrentFrame();
+                    ghost.frameOffset = sf::Vector2f{
+                        static_cast<float>(frame.offset.x),
+                        static_cast<float>(frame.offset.y)
+                    };
+                    if (ghost.sprite) {
+                        ghost.spriteHeight = ghost.sprite->getLocalBounds().size.y;
+                    }
+
+                    m_afterImageGhosts.push_back(std::move(ghost));
+                    while (static_cast<int>(m_afterImageGhosts.size()) > m_afterImageLength) {
+                        m_afterImageGhosts.erase(m_afterImageGhosts.begin());
+                    }
+                }
+            }
+        }
+    }
+
+    // 简化的更新路径 (P2 训练用, 仅物理 + 动画)
+    void Fighter::update(float dt, const SimpleInputState& input, const sf::Vector2f& opponentPos) {
+        if (isDead()) return;
+        dt = std::min(dt, 0.05f);
+        m_stateTimer += dt;
+
+        // 物理更新 (与 InputManager 路径相同)
+        float gravity = 0.f;
+        float friction = 1.f;
+        bool applyGroundCollision = true;
+
+        switch (m_physicsType) {
+            case 0: gravity = m_moveData.yaccel * 3600.f; friction = m_moveData.standFriction; break;
+            case 1: gravity = m_moveData.yaccel * 3600.f; friction = m_moveData.crouchFriction; break;
+            case 2: gravity = m_moveData.yaccel * 3600.f; friction = 1.f; break;
+            case 3: default: gravity = 0.f; friction = 1.f; applyGroundCollision = false; break;
+        }
+
+        m_velocity.y += gravity * dt;
+        m_position += m_velocity * dt;
+
+        if (applyGroundCollision && m_position.y >= GROUND_Y) {
+            m_position.y = GROUND_Y;
+            m_velocity.y = 0;
+            if (!m_isGrounded && m_physicsType == 2) {
+                requestStateChange(52);
+            }
+            m_isGrounded = true;
+        } else if (applyGroundCollision) {
+            m_isGrounded = false;
+        }
+
+        if (m_isGrounded && friction < 1.f) {
+            m_velocity.x *= std::pow(friction, dt * 60.f);
+            if (std::abs(m_velocity.x) < 5.f) m_velocity.x = 0;
+        }
+
+        // 受击标志更新
+        if (m_moveType == 2) {
+            if (static_cast<int>(m_stateTimer * 60.f) >= m_hitInfo.groundHittime) {
+                m_isHitOver = true;
+            }
+        }
+
+        m_animationPlayer.update(dt);
+    }
+    // ... existing code ...
+    void Fighter::draw(sf::RenderWindow& window) const {
+        // 1. 绘制 AfterImage 残影 (使用快照中的精灵副本, 半透明)
+        if (m_afterImageActive && !m_afterImageGhosts.empty()) {
+            int count = static_cast<int>(m_afterImageGhosts.size());
+            for (int i = 0; i < count; i++) {
+                const auto& ghost = m_afterImageGhosts[i];
+                if (!ghost.sprite) continue;
+                uint8_t alpha = static_cast<uint8_t>(80 * (i + 1) / count);
+
+                sf::Sprite ghostSprite = *ghost.sprite;
+                sf::Color c = ghostSprite.getColor();
+                c.a = alpha;
+                ghostSprite.setColor(c);
+
+                float finalX = ghost.position.x + ghost.frameOffset.x;
+                float finalY = ghost.position.y - ghost.spriteHeight + ghost.frameOffset.y;
+                ghostSprite.setPosition({finalX, finalY});
+                window.draw(ghostSprite);
+            }
+        }
+
+        // 2. 角色主体始终绘制
+        m_animationPlayer.draw(window, m_position);
+
+        // 3. 绘制 Explod 特效 (按 sprpriority 排序)
+        if (!m_explods.empty()) {
+            std::vector<const ExplodInstance*> sortedExplods;
+            sortedExplods.reserve(m_explods.size());
+            for (const auto& e : m_explods) sortedExplods.push_back(&e);
+            std::sort(sortedExplods.begin(), sortedExplods.end(),
+                [](const ExplodInstance* a, const ExplodInstance* b) {
+                    return a->sprpriority < b->sprpriority;
+                });
+            for (const auto* e : sortedExplods) {
+                e->animPlayer.draw(window, e->currentPos);
+            }
+        }
+
+        // ✅ 只有开启调试模式时，才绘制判定框
+        if (m_showDebug) {
+            const AnimFrame& currentFrame = m_animationPlayer.getCurrentFrame();
+
+            sf::Vector2f frameOffset{
+                static_cast<float>(currentFrame.offset.x),
+                static_cast<float>(currentFrame.offset.y)
+            };
+
+            // ✅ 关键修复：获取精灵高度，用于正确计算脚底对齐
+            sf::Vector2f spriteSize = m_animationPlayer.getSpriteSize();
+            float spriteHeight = spriteSize.y;
+
+            // ✅ 修复：与 AnimationPlayer::draw 使用相同的 Y 轴计算
+            float anchorX = m_position.x + frameOffset.x;
+            float anchorY = m_position.y - spriteHeight + frameOffset.y; // ← 修复这里！
+
+            auto drawRect = [&](const ClsnRect& rect, sf::Color color) {
+                float x1, x2;
+
+                if (isFacingRight()) {
+                    x1 = anchorX + rect.topLeft.x;
+                    x2 = anchorX + rect.bottomRight.x;
+                } else {
+                    x1 = anchorX - rect.bottomRight.x;
+                    x2 = anchorX - rect.topLeft.x;
+                }
+
+                // Clsn 框坐标是相对于角色轴位置 (m_position)，
+                // 不是精灵左上角 (anchorY)
+                float y1 = m_position.y + rect.topLeft.y;
+                float y2 = m_position.y + rect.bottomRight.y;
+
+                float left = std::min(x1, x2);
+                float top = std::min(y1, y2);
+                float width = std::abs(x2 - x1);
+                float height = std::abs(y2 - y1);
+
+                sf::RectangleShape shape({width, height});
+                shape.setPosition({left, top});
+                sf::Color fillColor = color;
+                fillColor.a = 60;
+                shape.setFillColor(fillColor);
+                shape.setOutlineThickness(1.5f);
+                shape.setOutlineColor(color);
+                window.draw(shape);
+            };
+
+            for (const auto& rect : currentFrame.clsn1) {
+                drawRect(rect, sf::Color::Red);
+            }
+            for (const auto& rect : currentFrame.clsn2) {
+                drawRect(rect, sf::Color::Green);
+            }
+
+            sf::FloatRect pushBox = getPushBox();
+            sf::RectangleShape pushShape({pushBox.size.x, pushBox.size.y});
+            pushShape.setPosition({pushBox.position.x, pushBox.position.y});
+            sf::Color blue(0, 100, 255, 50);
+            pushShape.setFillColor(blue);
+            pushShape.setOutlineColor(sf::Color::Blue);
+            pushShape.setOutlineThickness(1.0f);
+            window.draw(pushShape);
+        }
+    }
+
+    int Fighter::getHitVar(const std::string& name) const {
+        std::string n = name;
+        std::transform(n.begin(), n.end(), n.begin(), ::tolower);
+
+        if (n == "damage")          return m_hitInfo.damage;
+        if (n == "guarddamage")     return m_hitInfo.guardDamage;
+        if (n == "hittime" || n == "ground.hittime")  return m_hitInfo.groundHittime;
+        if (n == "air.hittime")     return m_hitInfo.airHittime;
+        if (n == "slidetime" || n == "ground.slidetime") return m_hitInfo.groundSlidetime;
+        if (n == "yvel")            return static_cast<int>(m_hitInfo.airVelocityY);
+        if (n == "xvel")            return static_cast<int>(m_hitInfo.airVelocityX);
+        if (n == "fall")            return m_hitInfo.fall ? 1 : 0;
+        if (n == "fall.recover")    return m_hitInfo.fallrecover ? 1 : 0;
+        if (n == "fall.yvel")       return static_cast<int>(m_hitInfo.fallyvel);
+        if (n == "yaccel")          return m_hitInfo.yaccel > 0 ? m_hitInfo.yaccel : static_cast<int>(m_moveData.yaccel * 3600.f);
+        if (n == "ctrltime")        return m_hitInfo.ctrltime > 0 ? m_hitInfo.ctrltime : m_hitInfo.groundHittime + 1;
+        if (n == "animtype") {
+            std::string t = m_hitInfo.animtype;
+            std::transform(t.begin(), t.end(), t.begin(), ::tolower);
+            if (t == "light")    return 0;
+            if (t == "medium")   return 1;
+            if (t == "hard")     return 2;
+            if (t == "back")     return 3;
+            if (t == "up")       return 4;
+            if (t == "diagup")   return 5;
+            return 0;
+        }
+        if (n == "groundtype") {
+            std::string t = m_hitInfo.groundType;
+            std::transform(t.begin(), t.end(), t.begin(), ::tolower);
+            if (t == "low")    return 2;
+            if (t == "trip")   return 3;
+            return 1; // High
+        }
+        if (n == "airtype") {
+            std::string t = m_hitInfo.airType;
+            std::transform(t.begin(), t.end(), t.begin(), ::tolower);
+            if (t == "low")    return 2;
+            if (t == "trip")   return 3;
+            return 1; // High
+        }
+        if (n == "juggle")          return m_hitInfo.juggle;
+        if (n == "hitid")           return m_hitInfo.hitid;
+        if (n == "envshaketime" || n == "envshake.time") return m_hitInfo.envshakeTime;
+
+        return 0;
+    }
+
+    void Fighter::setMoveType(int type) {
+        m_moveType = type;
+        if (type == 2) { // H = getting hit
+            m_isHitOver = false;
+            m_isHitShakeOver = false;
+        }
+    }
+
+
+    static sf::Vector2f LocalToWorld(const sf::Vector2f& localPos, const sf::Vector2f& position, const sf::Vector2f& offset, bool facingRight) {
+        float x = position.x + offset.x;
+        float y = position.y + offset.y;
+
+        if (facingRight) {
+            return {x + localPos.x, y + localPos.y};
+        } else {
+            return {x - localPos.x, y + localPos.y}; // 镜像翻转 X 轴
+        }
+    }
+
+    // 修改 getActiveHitbox：读取 Clsn1（攻击框）
+    sf::FloatRect Fighter::getActiveHitbox() const {
+        const auto& frame = m_animationPlayer.getCurrentFrame();
+        // 攻击框存储在 clsn1 中（符合 Mugen 规范）
+        if (frame.clsn1.empty()) return {};
+
+        sf::Vector2f offset{static_cast<float>(frame.offset.x),
+                            static_cast<float>(frame.offset.y)};
+        const auto& clsn = frame.clsn1[0];
+        sf::Vector2f p1 = LocalToWorld({static_cast<float>(clsn.topLeft.x), static_cast<float>(clsn.topLeft.y)}, m_position, offset, isFacingRight());
+        sf::Vector2f p2 = LocalToWorld({static_cast<float>(clsn.bottomRight.x), static_cast<float>(clsn.bottomRight.y)}, m_position, offset, isFacingRight());
+
+        return sf::FloatRect{
+                {std::min(p1.x, p2.x), std::min(p1.y, p2.y)},
+                {std::abs(p2.x - p1.x), std::abs(p2.y - p1.y)}
+        };
+    }
+
+    // 修改 getActiveHurtbox：读取 Clsn2（受击框）
+    sf::FloatRect Fighter::getActiveHurtbox() const {
+        const auto& frame = m_animationPlayer.getCurrentFrame();
+        // 受击框存储在 clsn2 中（符合 Mugen 规范）
+        if (frame.clsn2.empty()) return {};
+
+        sf::Vector2f offset{static_cast<float>(frame.offset.x),
+                            static_cast<float>(frame.offset.y)};
+        const auto& clsn = frame.clsn2[0];
+        sf::Vector2f p1 = LocalToWorld({static_cast<float>(clsn.topLeft.x), static_cast<float>(clsn.topLeft.y)}, m_position, offset, isFacingRight());
+        sf::Vector2f p2 = LocalToWorld({static_cast<float>(clsn.bottomRight.x), static_cast<float>(clsn.bottomRight.y)}, m_position, offset, isFacingRight());
+
+        return sf::FloatRect{
+                {std::min(p1.x, p2.x), std::min(p1.y, p2.y)},
+                {std::abs(p2.x - p1.x), std::abs(p2.y - p1.y)}
+        };
+    }
+
+    sf::FloatRect Fighter::getPushBox() const {
+        // Pushbox 的高度我们暂时固定为 100（覆盖大部分动作）
+        // Y 轴从脚底向上延伸
+        float height = m_pushHeight;
+        float y = m_position.y - height;
+
+        float left, right;
+
+        // ✅ 核心逻辑：根据朝向决定 Pushbox 的左右边界
+        if (m_animationPlayer.isFacingRight()) {
+            // 面向右：左边界是 back，右边界是 front
+            left = m_position.x - m_pushBack;
+            right = m_position.x + m_pushFront;
+        } else {
+            // 面向左：左边界变成 front，右边界变成 back
+            left = m_position.x - m_pushFront;
+            right = m_position.x + m_pushBack;
+        }
+
+        return {{left, y}, {right - left, height}};
+    }
+
+    void Fighter::setPosition(float x, float y) {
+        m_position = sf::Vector2f(x, y);
+    }
+
+    bool Fighter::isInGuardDist() const {
+        // 简化的防御距离检测: 对方在 80px 内时进入防御判定
+        // M.U.G.E.N 规范中由 guard.dist 参数控制
+        // 这里使用当前帧动画的 pushbox 宽度作为参考
+        float guardRange = m_pushFront + m_pushBack + 80.f;
+        return true; // 简化: 总是返回 true, 实际由状态切换逻辑判断
+    }
+
+    bool Fighter::isGuarding() const {
+        // Mugen 规范：120-132 是防御相关状态
+        return (m_currentStateNo >= 120 && m_currentStateNo <= 132);
+    }
+
+    void Fighter::addPower(int amount) {
+        m_currentPower += amount;
+        if (m_currentPower > m_maxPower) {
+            m_currentPower = m_maxPower;
+        }
+    }
+
+    void Fighter::addExplod(ExplodInstance explod) {
+        // 如果已有同 ID 的 explod, 先移除旧的
+        if (explod.id != 0) {
+            m_explods.erase(std::remove_if(m_explods.begin(), m_explods.end(),
+                [id = explod.id](const ExplodInstance& e) { return e.id == id; }), m_explods.end());
+        }
+        m_explods.push_back(std::move(explod));
+    }
+
+    void Fighter::removeExplod(int id) {
+        m_explods.erase(std::remove_if(m_explods.begin(), m_explods.end(),
+            [id](const ExplodInstance& e) { return e.id == id; }), m_explods.end());
+    }
+
+    void Fighter::clearExplods() {
+        m_explods.clear();
+    }
+
+    bool Fighter::getStateDefAttributes(int stateNo, int& outAnim, float& outVelX, float& outVelY) const {
+        const auto& states = m_stateRegistry.getStates();
+        auto it = states.find(stateNo);
+        if (it == states.end()) return false;
+        outAnim = (it->second.anim >= 0) ? it->second.anim : stateNo;
+        outVelX = it->second.velsetX;
+        outVelY = it->second.velsetY;
+        return true;
+    }
+
+    void Fighter::setAfterImage(int time, int timegap, int length) {
+        m_afterImageActive = true;
+        m_afterImageTime = time;
+        m_afterImageTimegap = timegap;
+        m_afterImageLength = length;
+        m_afterImageCaptureTimer = 0;
+        m_afterImageGhosts.clear();
+    }
+
+    void Fighter::addPendingHelper(const PendingHelper& ph) {
+        m_pendingHelpers.push_back(ph);
+    }
+
+    std::vector<Fighter::PendingHelper> Fighter::drainPendingHelpers() {
+        std::vector<PendingHelper> result;
+        result.swap(m_pendingHelpers);
+        return result;
+    }
+}
