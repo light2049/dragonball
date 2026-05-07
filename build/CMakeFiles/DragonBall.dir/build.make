@@ -251,11 +251,26 @@ CMakeFiles/DragonBall.dir/src/Utils/CmdParser.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/DragonBall.dir/src/Utils/CmdParser.cpp.s"
 	D:\mingw64\bin\c++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S D:\DragonBall\src\Utils\CmdParser.cpp -o CMakeFiles\DragonBall.dir\src\Utils\CmdParser.cpp.s
 
+CMakeFiles/DragonBall.dir/src/Utils/SFFDatabase.cpp.obj: CMakeFiles/DragonBall.dir/flags.make
+CMakeFiles/DragonBall.dir/src/Utils/SFFDatabase.cpp.obj: CMakeFiles/DragonBall.dir/includes_CXX.rsp
+CMakeFiles/DragonBall.dir/src/Utils/SFFDatabase.cpp.obj: D:/DragonBall/src/Utils/SFFDatabase.cpp
+CMakeFiles/DragonBall.dir/src/Utils/SFFDatabase.cpp.obj: CMakeFiles/DragonBall.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=D:\DragonBall\build\CMakeFiles --progress-num=$(CMAKE_PROGRESS_13) "Building CXX object CMakeFiles/DragonBall.dir/src/Utils/SFFDatabase.cpp.obj"
+	D:\mingw64\bin\c++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/DragonBall.dir/src/Utils/SFFDatabase.cpp.obj -MF CMakeFiles\DragonBall.dir\src\Utils\SFFDatabase.cpp.obj.d -o CMakeFiles\DragonBall.dir\src\Utils\SFFDatabase.cpp.obj -c D:\DragonBall\src\Utils\SFFDatabase.cpp
+
+CMakeFiles/DragonBall.dir/src/Utils/SFFDatabase.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/DragonBall.dir/src/Utils/SFFDatabase.cpp.i"
+	D:\mingw64\bin\c++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E D:\DragonBall\src\Utils\SFFDatabase.cpp > CMakeFiles\DragonBall.dir\src\Utils\SFFDatabase.cpp.i
+
+CMakeFiles/DragonBall.dir/src/Utils/SFFDatabase.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/DragonBall.dir/src/Utils/SFFDatabase.cpp.s"
+	D:\mingw64\bin\c++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S D:\DragonBall\src\Utils\SFFDatabase.cpp -o CMakeFiles\DragonBall.dir\src\Utils\SFFDatabase.cpp.s
+
 CMakeFiles/DragonBall.dir/src/Core/StateRegistry.cpp.obj: CMakeFiles/DragonBall.dir/flags.make
 CMakeFiles/DragonBall.dir/src/Core/StateRegistry.cpp.obj: CMakeFiles/DragonBall.dir/includes_CXX.rsp
 CMakeFiles/DragonBall.dir/src/Core/StateRegistry.cpp.obj: D:/DragonBall/src/Core/StateRegistry.cpp
 CMakeFiles/DragonBall.dir/src/Core/StateRegistry.cpp.obj: CMakeFiles/DragonBall.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=D:\DragonBall\build\CMakeFiles --progress-num=$(CMAKE_PROGRESS_13) "Building CXX object CMakeFiles/DragonBall.dir/src/Core/StateRegistry.cpp.obj"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=D:\DragonBall\build\CMakeFiles --progress-num=$(CMAKE_PROGRESS_14) "Building CXX object CMakeFiles/DragonBall.dir/src/Core/StateRegistry.cpp.obj"
 	D:\mingw64\bin\c++.exe $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/DragonBall.dir/src/Core/StateRegistry.cpp.obj -MF CMakeFiles\DragonBall.dir\src\Core\StateRegistry.cpp.obj.d -o CMakeFiles\DragonBall.dir\src\Core\StateRegistry.cpp.obj -c D:\DragonBall\src\Core\StateRegistry.cpp
 
 CMakeFiles/DragonBall.dir/src/Core/StateRegistry.cpp.i: cmake_force
@@ -280,6 +295,7 @@ DragonBall_OBJECTS = \
 "CMakeFiles/DragonBall.dir/src/Characters/Dummy.cpp.obj" \
 "CMakeFiles/DragonBall.dir/src/Utils/CNSController.cpp.obj" \
 "CMakeFiles/DragonBall.dir/src/Utils/CmdParser.cpp.obj" \
+"CMakeFiles/DragonBall.dir/src/Utils/SFFDatabase.cpp.obj" \
 "CMakeFiles/DragonBall.dir/src/Core/StateRegistry.cpp.obj"
 
 # External object files for target DragonBall
@@ -297,6 +313,7 @@ DragonBall.exe: CMakeFiles/DragonBall.dir/src/UI/HUD.cpp.obj
 DragonBall.exe: CMakeFiles/DragonBall.dir/src/Characters/Dummy.cpp.obj
 DragonBall.exe: CMakeFiles/DragonBall.dir/src/Utils/CNSController.cpp.obj
 DragonBall.exe: CMakeFiles/DragonBall.dir/src/Utils/CmdParser.cpp.obj
+DragonBall.exe: CMakeFiles/DragonBall.dir/src/Utils/SFFDatabase.cpp.obj
 DragonBall.exe: CMakeFiles/DragonBall.dir/src/Core/StateRegistry.cpp.obj
 DragonBall.exe: CMakeFiles/DragonBall.dir/build.make
 DragonBall.exe: D:/SFML-3.0.2/lib/libsfml-graphics-d.a
@@ -305,7 +322,7 @@ DragonBall.exe: D:/SFML-3.0.2/lib/libsfml-system-d.a
 DragonBall.exe: CMakeFiles/DragonBall.dir/linkLibs.rsp
 DragonBall.exe: CMakeFiles/DragonBall.dir/objects1.rsp
 DragonBall.exe: CMakeFiles/DragonBall.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=D:\DragonBall\build\CMakeFiles --progress-num=$(CMAKE_PROGRESS_14) "Linking CXX executable DragonBall.exe"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=D:\DragonBall\build\CMakeFiles --progress-num=$(CMAKE_PROGRESS_15) "Linking CXX executable DragonBall.exe"
 	$(CMAKE_COMMAND) -E cmake_link_script CMakeFiles\DragonBall.dir\link.txt --verbose=$(VERBOSE)
 	D:\bin\cmake.exe -E copy_directory D:/SFML-3.0.2/bin D:/DragonBall/build
 	D:\bin\cmake.exe -E copy_directory D:/DragonBall/Data D:/DragonBall/build/Data

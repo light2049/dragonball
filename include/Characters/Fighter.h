@@ -24,7 +24,8 @@ namespace db {
         float airguardVelocityX = -1.9f; // 空中防御击退
         float airguardVelocityY = -0.8f;
         std::string animtype = "Light"; // Light/Medium/Hard/Diagup/Up/Back
-        int p2stateno = 0;           // 强制跳转状态
+        int p1stateno = 0;           // 攻击方命中后跳转状态(连段)
+        int p2stateno = 0;           // 受击方强制跳转状态
         bool fall = false;           // 是否会倒地
         bool fallrecover = true;     // 可否受身
         float fallyvel = 0.f;        // 倒地Y速度
@@ -49,6 +50,7 @@ namespace db {
         sf::Vector2f vel;          // 每帧速度 (px/tick)
         sf::Vector2f currentPos;   // 当前世界坐标
         int facing = 1;            // 1=同父级方向, -1=相反方向
+        bool removeOnGetHit = false; // 被击中时移除
         bool done = false;
     };
 
@@ -69,6 +71,7 @@ namespace db {
         void requestStateChange(int stateNo);
 
         void takeDamage(int damage);
+        void resetLife();
         int getCurrentLife() const;
         int getMaxLife() const;
         bool isDead() const;
@@ -98,6 +101,13 @@ namespace db {
 
         void setPosition(float x, float y);
         sf::FloatRect getPushBox() const;
+        // 获取当前脚底 Y 坐标 (基于轴位置和当前帧 offset.y)
+        float getFeetY() const;
+        sf::Vector2f getOpponentPos() const { return m_opponentPos; }
+        void setRoundState(int s) { m_roundState = s; }
+        int getRoundState() const { return m_roundState; }
+        void setRoundNo(int n) { m_roundNo = n; }
+        int getRoundNo() const { return m_roundNo; }
 
         static void setShowDebug(bool show) { m_showDebug = show; }
         static bool getShowDebug() { return m_showDebug; }
@@ -119,6 +129,7 @@ namespace db {
 
         // ✅ 新增：暴露 AnimationPlayer (供 Game.cpp 帧判定使用)
         const AnimationPlayer& getAnimationPlayer() const { return m_animationPlayer; }
+        AnimationPlayer& getAnimationPlayer() { return m_animationPlayer; }
 
         // ✅ 新增：控制权 (Ctrl)
         bool hasControl() const { return m_hasControl; }
@@ -128,6 +139,9 @@ namespace db {
         int getCurrentStateNo() const { return m_currentStateNo; }
 
         // ✅ 新增：CNS 状态执行 (供 Game.cpp 在外部调用)
+        StateRegistry& getStateRegistry() { return m_stateRegistry; }
+        const StateRegistry& getStateRegistry() const { return m_stateRegistry; }
+
         void executeCurrentStateCNS(InputManager* inputMgr, float dt) {
             m_stateRegistry.executeState(m_currentStateNo, *this, inputMgr, dt);
         }
@@ -221,6 +235,13 @@ namespace db {
         int getShakeTime() const { return m_shakeTime; }
         int getShakeAmpl() const { return m_shakeAmpl; }
 
+        // SuperPause
+        void setSuperPause(int time, bool darken);
+        bool isInSuperPause() const { return m_superPauseTime > 0; }
+        int getSuperPauseTime() const { return m_superPauseTime; }
+        bool getSuperPauseDarken() const { return m_superPauseDarken; }
+        void tickSuperPause() { if (m_superPauseTime > 0) m_superPauseTime--; }
+
         // ✅ Explod 管理
         void addExplod(ExplodInstance explod);
         void removeExplod(int id);
@@ -243,9 +264,12 @@ namespace db {
         struct PendingHelper {
             int id = 0;
             int animId = -1;
+            int stateNo = 0;        // Helper 状态号(用于 CNS 执行)
             sf::Vector2f position;
             sf::Vector2f velocity;  // px/tick
             bool facingRight = true;
+            int damage = 20;
+            int sparkno = 1200;
         };
         void addPendingHelper(const PendingHelper& ph);
         std::vector<PendingHelper> drainPendingHelpers();
@@ -299,6 +323,12 @@ namespace db {
         // ✅ 画面震动 (EnvShake)
         int m_shakeTime = 0;
         int m_shakeAmpl = 0;
+        int m_superPauseTime = 0;
+        bool m_superPauseDarken = false;
+        int m_roundState = 0;
+        int m_roundNo = 1;
+        sf::Vector2f m_opponentPos;  // 对手位置(用于 CNS 表达式)
+        mutable std::vector<HitDef> m_lastAttackHitDefs; // 保留上帧攻击的 HitDefs
 
         // ✅ Explod 特效实例列表
         std::vector<ExplodInstance> m_explods;

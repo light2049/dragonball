@@ -91,27 +91,28 @@ namespace db {
         if (!m_sprite) return;
 
         sf::Sprite tempSprite(*m_sprite);
-        float height = tempSprite.getLocalBounds().size.y;
 
-        sf::Vector2f frameOffset{0.f, 0.f};
         BlendMode blendMode = BlendMode::Normal;
+        float axisX = 0.f, axisY = 0.f;
         if (m_currentAnimation && m_currentFrameIndex < m_currentAnimation->frames.size()) {
             const auto& frame = m_currentAnimation->frames[m_currentFrameIndex];
-            frameOffset = sf::Vector2f{static_cast<float>(frame.offset.x), static_cast<float>(frame.offset.y)};
+            axisX = static_cast<float>(frame.axisX);
+            axisY = static_cast<float>(frame.axisY);
             blendMode = frame.blendMode;
         }
 
-        float finalX = position.x + frameOffset.x;
-        float finalY = position.y - height + frameOffset.y;
+        // 轴对齐: 精灵的轴 (axisX, axisY) 对齐到 position，受缩放影响
+        float renderScaleX = (m_facingRight ? 1.0f : -1.0f) * m_scaleX;
+        float finalX = position.x - axisX * renderScaleX;
+        float finalY = position.y - axisY * m_scaleY;
 
-        tempSprite.setScale({ (m_facingRight ? 1.0f : -1.0f) * m_scaleX, m_scaleY });
+        tempSprite.setScale({ renderScaleX, m_scaleY });
         tempSprite.setPosition({finalX, finalY});
 
         sf::RenderStates states;
         if (blendMode == BlendMode::Additive) {
             states.blendMode = sf::BlendAdd;
         } else if (blendMode == BlendMode::Subtractive) {
-            // dst - src
             states.blendMode = sf::BlendMode(sf::BlendMode::Factor::One, sf::BlendMode::Factor::One, sf::BlendMode::Equation::ReverseSubtract);
         }
         window.draw(tempSprite, states);
@@ -121,31 +122,29 @@ namespace db {
         if (!m_sprite) return;
 
         sf::Sprite tempSprite(*m_sprite);
-        float height = tempSprite.getLocalBounds().size.y;
 
-        sf::Vector2f frameOffset{0.f, 0.f};
         BlendMode blendMode = BlendMode::Normal;
+        float axisX = 0.f, axisY = 0.f;
         if (m_currentAnimation && m_currentFrameIndex < m_currentAnimation->frames.size()) {
             const auto& frame = m_currentAnimation->frames[m_currentFrameIndex];
-            frameOffset = sf::Vector2f{static_cast<float>(frame.offset.x), static_cast<float>(frame.offset.y)};
+            axisX = static_cast<float>(frame.axisX);
+            axisY = static_cast<float>(frame.axisY);
             blendMode = frame.blendMode;
         }
 
-        float finalX = position.x + frameOffset.x;
-        float finalY = position.y - height + frameOffset.y;
+        // 轴对齐: 精灵的轴 (axisX, axisY) 对齐到 position，受缩放影响
+        float renderScaleX = (m_facingRight ? 1.0f : -1.0f) * m_scaleX;
+        float finalX = position.x - axisX * renderScaleX;
+        float finalY = position.y - axisY * m_scaleY;
 
         sf::Color color = tempSprite.getColor();
         color.a = alpha;
         tempSprite.setColor(color);
-        tempSprite.setScale({ (m_facingRight ? 1.0f : -1.0f) * m_scaleX, m_scaleY });
+        tempSprite.setScale({ renderScaleX, m_scaleY });
         tempSprite.setPosition({finalX, finalY});
 
         sf::RenderStates states;
-        if (blendMode == BlendMode::Additive) {
-            states.blendMode = sf::BlendAdd;
-        } else if (blendMode == BlendMode::Subtractive) {
-            states.blendMode = sf::BlendMode(sf::BlendMode::Factor::One, sf::BlendMode::Factor::One, sf::BlendMode::Equation::ReverseSubtract);
-        }
+        states.blendMode = sf::BlendAdd;
         window.draw(tempSprite, states);
     }
 

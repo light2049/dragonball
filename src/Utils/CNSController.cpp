@@ -54,6 +54,11 @@ namespace db {
         if (t == "hitby")           return ControllerType::HITBY;
         if (t == "sprpriority")     return ControllerType::SPRPRIORITY;
         if (t == "helper")          return ControllerType::HELPER;
+        if (t == "superpause")      return ControllerType::SUPERPAUSE;
+        if (t == "bindtoroot")      return ControllerType::BIND_TO_ROOT;
+        if (t == "destroyself")      return ControllerType::DESTROY_SELF;
+        if (t == "angledraw")        return ControllerType::ANGLEDRAW;
+        if (t == "trans")            return ControllerType::TRANS;
 
         return ControllerType::NONE;
     }
@@ -84,6 +89,13 @@ namespace db {
             case ControllerType::REMOVEEXPLOD:  return std::make_unique<RemoveExplodController>();
             case ControllerType::HELPER:        return std::make_unique<HelperController>();
             case ControllerType::AFTERIMAGE:    return std::make_unique<AfterImageController>();
+            case ControllerType::SUPERPAUSE:    return std::make_unique<SuperPauseController>();
+            case ControllerType::BIND_TO_ROOT:  return std::make_unique<BindToRootController>();
+            case ControllerType::DESTROY_SELF:  return std::make_unique<DestroySelfController>();
+            case ControllerType::VARRANGESET:   return std::make_unique<VarRangeSetController>();
+            case ControllerType::ASSERTSPECIAL: return std::make_unique<AssertSpecialController>();
+            case ControllerType::ANGLEDRAW:     return std::make_unique<AngleDrawController>();
+            case ControllerType::TRANS:          return std::make_unique<TransController>();
             default:                            return nullptr;
         }
     }
@@ -295,6 +307,8 @@ namespace db {
 
             case CondType::VEL_X: {
                 float vx = fighter.getVelocityX();
+                // M.U.G.E.N: vel x 是相对于角色朝向
+                if (!fighter.isFacingRight()) { vx = -vx; }
                 switch (op) {
                     case CondOp::GT:  result = (vx > rhsFloat); break;
                     case CondOp::GTE: result = (vx >= rhsFloat); break;
@@ -350,11 +364,24 @@ namespace db {
             }
 
             case CondType::ROUNDSTATE: {
-                // 简化: roundstate 直接返回 true (默认总是战斗中)
-                result = true;
+                int rs = fighter.getRoundState();
+                switch (op) {
+                    case CondOp::EQ:  result = (rs == rhsInt); break;
+                    case CondOp::NEQ: result = (rs != rhsInt); break;
+                    default: result = (rs == rhsInt); break;
+                }
                 break;
             }
 
+            case CondType::ROUNDNO: {
+                int rn = fighter.getRoundNo();
+                switch (op) {
+                    case CondOp::EQ:  result = (rn == rhsInt); break;
+                    case CondOp::NEQ: result = (rn != rhsInt); break;
+                    default: result = (rn == rhsInt); break;
+                }
+                break;
+            }
             case CondType::INGUARDDIST: {
                 result = fighter.isInGuardDist();
                 break;
@@ -590,6 +617,10 @@ namespace db {
                 cond.type = CondType::LIFE;
                 try { cond.rhsInt = std::stoi(rhs); } catch(...) { cond.rhsInt = 0; }
             }
+            else if (lhsLower == "roundstate") {
+                cond.type = CondType::ROUNDSTATE;
+                try { cond.rhsInt = std::stoi(rhs); } catch(...) { cond.rhsInt = 0; }
+            }
             else if (lhsLower == "anim") {
                 cond.type = CondType::ANIM;
                 try { cond.rhsInt = std::stoi(rhs); } catch(...) { cond.rhsInt = 0; }
@@ -617,10 +648,6 @@ namespace db {
             else if (lhsLower == "pos x" || lhsLower == "posx") {
                 cond.type = CondType::POS_X;
                 try { cond.rhsFloat = std::stof(rhs); } catch(...) { cond.rhsFloat = 0.f; }
-            }
-            else if (lhsLower == "roundstate") {
-                cond.type = CondType::ROUNDSTATE;
-                try { cond.rhsInt = std::stoi(rhs); } catch(...) { cond.rhsInt = 0; }
             }
             else if (lhsLower == "roundno") {
                 cond.type = CondType::ROUNDNO;
@@ -723,8 +750,6 @@ namespace db {
     // ==========================================
 
     // 前向声明: 简易 CNS 表达式求值
-    static int evaluateCNSExpression(const std::string& expr, const Fighter& fighter);
-
     // --- ChangeState ---
     ChangeStateController::ChangeStateController() {
         type = ControllerType::CHANGESTATE;
@@ -738,8 +763,8 @@ namespace db {
     }
 
     // --- ChangeAnim ---
-    // 简易 CNS 表达式求值: 支持 ifelse(), GetHitVar(), statetype, 数字, +, *
-    static int evaluateCNSExpression(const std::string& expr, const Fighter& fighter);
+    // 简易 CNS 表达式求值: 支持 ifelse(), GetHitVar(), statetype, 数字, +, *, p2dist
+    int evaluateCNSExpression(const std::string& expr, const Fighter& fighter);
 
     // 辅助: 判断布尔条件并返回 0 或 1
     static int evaluateCNSBool(const std::string& cond, const Fighter& fighter) {
@@ -875,6 +900,22 @@ namespace db {
             }
         }
 
+        // p2dist x / p2dist y → 到对手的距离
+        {
+            std::string lower = s;
+            std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
+            if (lower == "p2dist x") {
+                sf::Vector2f opp = fighter.getOpponentPos();
+                float dist = opp.x - fighter.getPosition().x;
+                return negated ? -static_cast<int>(dist) : static_cast<int>(dist);
+            }
+            if (lower == "p2dist y") {
+                sf::Vector2f opp = fighter.getOpponentPos();
+                float dist = opp.y - fighter.getPosition().y;
+                return negated ? -static_cast<int>(dist) : static_cast<int>(dist);
+            }
+        }
+
         // const(path) → 查找速度/运动常量 (返回 raw px/tick)
         {
             std::string lower = s;
@@ -896,7 +937,7 @@ namespace db {
     }
 
     // 主表达式求值: 处理 + 和 *
-    static int evaluateCNSExpression(const std::string& expr, const Fighter& fighter) {
+    int evaluateCNSExpression(const std::string& expr, const Fighter& fighter) {
         std::string s = trimStr(expr);
         if (s.empty()) return 0;
 
@@ -955,7 +996,9 @@ namespace db {
             if (!valueXStr.empty()) {
                 vx = static_cast<float>(evaluateCNSExpression(valueXStr, fighter));
             }
-            fighter.setVelocityX(vx * 60.f);  // px/tick → px/s
+            // M.U.G.E.N: 正X=向前，面朝左时翻转
+            if (!fighter.isFacingRight()) { vx = -vx; }
+            fighter.setVelocityX(vx * 60.f);
         }
         if (hasY) {
             float vy = valueY;
@@ -971,7 +1014,9 @@ namespace db {
         type = ControllerType::VELADD;
     }
     void VelAddController::execute(Fighter& fighter, InputManager* inputMgr, float dt) const {
-        fighter.addVelocity(valueX, valueY);
+        float addX = valueX;
+        if (!fighter.isFacingRight()) { addX = -addX; }
+        fighter.addVelocity(addX, valueY);
     }
 
     // --- VelMul ---
@@ -1008,7 +1053,11 @@ namespace db {
         type = ControllerType::POSSET;
     }
     void PosSetController::execute(Fighter& fighter, InputManager* inputMgr, float dt) const {
-        fighter.setPosition(fighter.getPosition().x + valueX, fighter.getPosition().y + valueY);
+        float setX = valueX;
+        float setY = valueY;
+        if (!valueXStr.empty()) setX = static_cast<float>(evaluateCNSExpression(valueXStr, fighter));
+        if (!valueYStr.empty()) setY = static_cast<float>(evaluateCNSExpression(valueYStr, fighter));
+        fighter.setPosition(fighter.getPosition().x + setX, fighter.getPosition().y + setY);
     }
 
     // --- PosAdd ---
@@ -1016,8 +1065,12 @@ namespace db {
         type = ControllerType::POSADD;
     }
     void PosAddController::execute(Fighter& fighter, InputManager* inputMgr, float dt) const {
-        fighter.addPositionX(valueX);
-        fighter.addPositionY(valueY);
+        float addX = valueX;
+        float addY = valueY;
+        if (!valueXStr.empty()) addX = static_cast<float>(evaluateCNSExpression(valueXStr, fighter));
+        if (!valueYStr.empty()) addY = static_cast<float>(evaluateCNSExpression(valueYStr, fighter));
+        fighter.addPositionX(addX);
+        fighter.addPositionY(addY);
     }
 
     // --- PowerAdd ---
@@ -1170,6 +1223,8 @@ namespace db {
             try { m_removetime = std::stoi(value); } catch (...) {}
         } else if (lowerKey == "sprpriority") {
             try { m_sprpriority = std::stoi(value); } catch (...) {}
+        } else if (lowerKey == "removeongethit") {
+            try { m_removeOnGetHit = (std::stoi(value) != 0); } catch (...) {}
         } else if (lowerKey == "scale") {
             size_t comma = value.find(',');
             if (comma != std::string::npos) {
@@ -1189,6 +1244,7 @@ namespace db {
         explod.bindtime = m_bindtime;
         explod.removetime = m_removetime;
         explod.sprpriority = m_sprpriority;
+        explod.removeOnGetHit = m_removeOnGetHit;
         explod.pos = {m_posX, m_posY};
         explod.vel = {m_velX, m_velY};
         explod.facing = m_facing;  // 1=same as parent, -1=opposite
@@ -1200,44 +1256,16 @@ namespace db {
         // Scale (from CNS, default 1,1)
         explod.animPlayer.setScale(m_scaleX, m_scaleY);
 
-        // 根据 postype 计算初始世界坐标
-        // M.U.G.E.N: Explod sprite axis = P1_axis + (pos.x*dir, pos.y)
-        // P1_axis (M.U.G.E.N) = fighter.getPosition() 在 M.U.G.E.N 中
-        // 但由于当前渲染中 position.y 是精灵底部 (M.U.G.E.N: 精灵底部 = axis.y + spriteHeight)
-        // 需要转换: renderPos.y = mugenAxis.y + explodHeight - 2*explodOffset.y
+        // Explod 位置 = fighter 轴位置 + CNS pos 偏移
+        // draw() 会自动处理精灵轴对齐 (axisX/axisY + scale)
         sf::Vector2f fPos = fighter.getPosition();
         float dir = parentFacing ? 1.f : -1.f;
 
-        // Explod 精灵尺寸 (texture 大小)
-        float eW = explod.animPlayer.getSpriteSize().x;
-        float eH = explod.animPlayer.getSpriteSize().y;
-        sf::Vector2i eOff = explod.animPlayer.getCurrentFrame().offset;
-
-        // 角色当前精灵尺寸
-        float cW = fighter.getAnimationPlayer().getSpriteSize().x;
-        float cH = fighter.getAnimationPlayer().getSpriteSize().y;
-
         if (m_postype == "p1") {
-            // p1: 相对自身
-            // M.U.G.E.N: sprite 左上角 = explod_axis - eOff
-            // 当前: sprite 左上角 = renderPos + eOff 且 renderPos.y - eH + eOff.y = 左上角.y
-            // 转换: renderPos = (mugenAxis.x - 2*eOff.x, mugenAxis.y + eH - 2*eOff.y)
-            // 其中 mugenAxis = fPos 在 M.U.G.E.N 坐标中
-            // 但 fPos 已是渲染坐标中的"底部"，需转回 M.U.G.E.N 轴再转回渲染
-            // fPos (rendering) → mugenAxis: mugenAxis.y = fPos.y - cH + 2*0
-            //                    mugenAxis.x = fPos.x + 2*0 (offset=0)
-            // 但对于 Explod 来说，它相对的是 P1 的 AXIS，即 M.U.G.E.N pos，不经过 sprite 渲染
-            // 直接使用: renderPos.y = (fPos.y - cH) + posY + eH
-            float mugenAxisX = fPos.x + m_posX * dir;
-            float mugenAxisY = (fPos.y - cH) + m_posY;
-            explod.currentPos = {
-                mugenAxisX - 2.f * eOff.x,
-                mugenAxisY + eH - 2.f * eOff.y
-            };
-        } else if (m_postype == "p2") {
-            // 相对对手 (简化)
             explod.currentPos = {fPos.x + m_posX * dir, fPos.y + m_posY};
-        } else if (m_postype == "front") {
+        } else if (m_postype == "p2") {
+            explod.currentPos = {fPos.x + m_posX * dir, fPos.y + m_posY};
+        } else if (m_postype == "front" || m_postype == "back" || m_postype == "left" || m_postype == "right") {
             explod.currentPos = {m_posX, m_posY};
         } else {
             explod.currentPos = {m_posX, m_posY};
@@ -1305,9 +1333,20 @@ namespace db {
         Fighter::PendingHelper ph;
         ph.id = m_id;
         ph.animId = animId;
+        ph.stateNo = m_stateno;
         ph.position = pos;
         ph.velocity = {velX, velY};  // px/tick
+        std::cout << "[HelperCtrl] fire state=" << m_stateno
+                  << " parentState=" << fighter.getCurrentStateNo()
+                  << " moveContact=" << fighter.hasMoveContact()
+                  << " moveHit=" << fighter.hasMoveHit() << std::endl;
         ph.facingRight = (m_facing == 1) ? fighter.isFacingRight() : !fighter.isFacingRight();
+        // 从攻击者的 HitDef 取伤害和火花
+        const auto& hitDefs = fighter.getCurrentHitDefs();
+        if (!hitDefs.empty()) {
+            ph.damage = hitDefs[0].damage;
+            ph.sparkno = hitDefs[0].sparkno;
+        }
         fighter.addPendingHelper(ph);
     }
 
@@ -1333,5 +1372,116 @@ namespace db {
     void AfterImageController::execute(Fighter& fighter, InputManager* inputMgr, float dt) const {
         fighter.setAfterImage(m_time, m_timegap, m_length);
     }
+
+    // ==========================================
+    // SuperPauseController
+    // ==========================================
+    SuperPauseController::SuperPauseController() {
+        type = ControllerType::SUPERPAUSE;
+    }
+    void SuperPauseController::parse(const std::string& key, const std::string& value) {
+        std::string lowerKey = key;
+        std::transform(lowerKey.begin(), lowerKey.end(), lowerKey.begin(), ::tolower);
+        if (lowerKey == "time") {
+            try { m_time = std::stoi(value); } catch (...) {}
+        } else if (lowerKey == "darken") {
+            try { m_darken = std::stoi(value); } catch (...) {}
+        } else if (lowerKey == "pos") {
+            size_t comma = value.find(',');
+            if (comma != std::string::npos) {
+                try { m_posX = std::stoi(value.substr(0, comma)); } catch (...) {}
+                try { m_posY = std::stoi(value.substr(comma + 1)); } catch (...) {}
+            }
+        }
+    }
+    void SuperPauseController::execute(Fighter& fighter, InputManager* inputMgr, float dt) const {
+        // SuperPause 效果由 Game 层处理，这里标记给 Game
+        // 通过 Fighter 上的方法设置 SuperPause
+        fighter.setSuperPause(m_time, m_darken != 0);
+    }
+
+    // ==========================================
+    // BindToRootController
+    // ==========================================
+    BindToRootController::BindToRootController() {
+        type = ControllerType::BIND_TO_ROOT;
+    }
+    void BindToRootController::parse(const std::string& key, const std::string& value) {
+        std::string lowerKey = key;
+        std::transform(lowerKey.begin(), lowerKey.end(), lowerKey.begin(), ::tolower);
+        if (lowerKey == "pos") {
+            size_t comma = value.find(',');
+            if (comma != std::string::npos) {
+                try { m_posX = std::stoi(value.substr(0, comma)); } catch (...) {}
+                try { m_posY = std::stoi(value.substr(comma + 1)); } catch (...) {}
+            }
+        }
+    }
+
+    // ==========================================
+    // DestroySelfController (Helper 自毁)
+    // ==========================================
+    DestroySelfController::DestroySelfController() {
+        type = ControllerType::DESTROY_SELF;
+    }
+    void DestroySelfController::parse(const std::string& key, const std::string& value) {}
+
+    // ==========================================
+    // VarRangeSetController
+    // ==========================================
+    VarRangeSetController::VarRangeSetController() {
+        type = ControllerType::VARRANGESET;
+    }
+    void VarRangeSetController::parse(const std::string& key, const std::string& value) {
+        std::string lowerKey = key;
+        std::transform(lowerKey.begin(), lowerKey.end(), lowerKey.begin(), ::tolower);
+        if (lowerKey == "value") {
+            try { m_value = std::stoi(value); } catch(...) {}
+        }
+    }
+    void VarRangeSetController::execute(Fighter& fighter, InputManager* inputMgr, float dt) const {
+        // 清空所有 sysvar (0-59)
+        for (int i = 0; i < 60; i++) fighter.setSysVar(i, m_value);
+    }
+
+    // ==========================================
+    // AssertSpecialController
+    // ==========================================
+    AssertSpecialController::AssertSpecialController() {
+        type = ControllerType::ASSERTSPECIAL;
+    }
+    void AssertSpecialController::parse(const std::string& key, const std::string& value) {
+        // 简化: 不处理特殊标志
+    }
+
+    // ==========================================
+    // AngleDrawController
+    // ==========================================
+    AngleDrawController::AngleDrawController() {
+        type = ControllerType::ANGLEDRAW;
+    }
+    void AngleDrawController::parse(const std::string& key, const std::string& value) {
+        std::string lowerKey = key;
+        std::transform(lowerKey.begin(), lowerKey.end(), lowerKey.begin(), ::tolower);
+        if (lowerKey == "scale") {
+            size_t comma = value.find(',');
+            if (comma != std::string::npos) {
+                try { m_scaleX = std::stof(value.substr(0, comma)); } catch(...) {}
+                try { m_scaleY = std::stof(value.substr(comma + 1)); } catch(...) {}
+            }
+        }
+    }
+
+    // ==========================================
+    // TransController
+    // ==========================================
+    TransController::TransController() {
+        type = ControllerType::TRANS;
+    }
+    void TransController::parse(const std::string& key, const std::string& value) {}
+    void TransController::execute(Fighter& fighter, InputManager* inputMgr, float dt) const {}
+    void AssertSpecialController::execute(Fighter& fighter, InputManager* inputMgr, float dt) const {}
+    void DestroySelfController::execute(Fighter& fighter, InputManager* inputMgr, float dt) const {}
+    void AngleDrawController::execute(Fighter& fighter, InputManager* inputMgr, float dt) const {}
 
 } // namespace db

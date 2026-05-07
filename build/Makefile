@@ -440,6 +440,30 @@ src/Utils/CnsParser.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles\DragonBall.dir\build.make CMakeFiles/DragonBall.dir/src/Utils/CnsParser.cpp.s
 .PHONY : src/Utils/CnsParser.cpp.s
 
+src/Utils/SFFDatabase.obj: src/Utils/SFFDatabase.cpp.obj
+.PHONY : src/Utils/SFFDatabase.obj
+
+# target to build an object file
+src/Utils/SFFDatabase.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\DragonBall.dir\build.make CMakeFiles/DragonBall.dir/src/Utils/SFFDatabase.cpp.obj
+.PHONY : src/Utils/SFFDatabase.cpp.obj
+
+src/Utils/SFFDatabase.i: src/Utils/SFFDatabase.cpp.i
+.PHONY : src/Utils/SFFDatabase.i
+
+# target to preprocess a source file
+src/Utils/SFFDatabase.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\DragonBall.dir\build.make CMakeFiles/DragonBall.dir/src/Utils/SFFDatabase.cpp.i
+.PHONY : src/Utils/SFFDatabase.cpp.i
+
+src/Utils/SFFDatabase.s: src/Utils/SFFDatabase.cpp.s
+.PHONY : src/Utils/SFFDatabase.s
+
+# target to generate assembly for a file
+src/Utils/SFFDatabase.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\DragonBall.dir\build.make CMakeFiles/DragonBall.dir/src/Utils/SFFDatabase.cpp.s
+.PHONY : src/Utils/SFFDatabase.cpp.s
+
 # Help Target
 help:
 	@echo The following are some of the valid targets for this Makefile:
@@ -488,6 +512,9 @@ help:
 	@echo ... src/Utils/CnsParser.obj
 	@echo ... src/Utils/CnsParser.i
 	@echo ... src/Utils/CnsParser.s
+	@echo ... src/Utils/SFFDatabase.obj
+	@echo ... src/Utils/SFFDatabase.i
+	@echo ... src/Utils/SFFDatabase.s
 .PHONY : help
 
 

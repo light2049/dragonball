@@ -43,16 +43,25 @@ namespace db {
             m_player->loadCommands(CMD_FILE);
             // 初始化完成后正式进入状态 0，确保状态属性被正确应用
             m_player->requestStateChange(0);
-            logMsg("Player loaded\n");
+            // 调整到轴参考系: 轴位置 = 地面 - 帧 offset.y
+            {
+                float offsetY = static_cast<float>(m_player->getAnimationPlayer().getCurrentFrame().offset.y);
+                m_player->setPosition(200.0f, 480.0f - offsetY);
+                logMsg("Player loaded\n");
+            }
 
             m_dummy = std::make_unique<Fighter>();
-            m_dummy->setPosition(600.0f, 480.0f);
             m_dummy->loadAnimations(AIR_FILE, SPRITE_DIR, CHAR_NAME);
             m_dummy->loadStats(CNS_FILE);
             m_dummy->loadCommonStates(CMS_FILE);
             m_dummy->loadCommands(CMD_FILE);
             m_dummy->requestStateChange(0);
-            logMsg("Dummy loaded\n");
+            // 调整到轴参考系: 轴位置 = 地面 - 帧 offset.y
+            {
+                float offsetY = static_cast<float>(m_dummy->getAnimationPlayer().getCurrentFrame().offset.y);
+                m_dummy->setPosition(600.0f, 480.0f - offsetY);
+                logMsg("Dummy loaded\n");
+            }
 
             m_hudP1 = std::make_unique<HUD>();
             m_hudP1->setPosition(20.0f, 20.0f);
@@ -81,6 +90,16 @@ namespace db {
             err += "\n";
             logMsg(err.c_str());
         }
+        // 开场: 执行 5900 (初始化), 由 CNS 决定 190 (intro) 或 0 (战斗)
+        if (m_player && m_dummy) {
+            m_player->setRoundState(1);
+            m_dummy->setRoundState(1);
+            m_player->setRoundNo(1);
+            m_dummy->setRoundNo(1);
+            m_player->requestStateChange(5900);
+            m_dummy->requestStateChange(5900);
+        }
+        m_gameState = GameState::INTRO;
     }
 
     Game::~Game() { window_.close(); }
@@ -132,11 +151,57 @@ namespace db {
     }
 
     void Game::update(float dt) {
-        // 1. HitStop 冻结逻辑
+        // 0. 开场动画 (检测进入循环后切到 191 → 0 → FIGHT)
+        if (m_gameState == GameState::INTRO) {
+            // 由 CNS State 190 自己控制: ChangeAnim(RoundState=1 时不冻结) → AnimTime=0 → ChangeState 0
+            if (m_player && m_dummy &&
+                m_player->getCurrentStateNo() == 0 &&
+                m_dummy->getCurrentStateNo() == 0) {
+                m_gameState = GameState::FIGHT;
+                std::cout << "[FIGHT] Round " << m_roundNumber << std::endl;
+            }
+            // 安全兜底: 15 秒强制退出
+            m_roundTimer += dt;
+            if (m_roundTimer > 15.f) {
+                if (m_player) { m_player->requestStateChange(0); }
+                if (m_dummy) { m_dummy->requestStateChange(0); }
+                m_gameState = GameState::FIGHT;
+            }
+        }
+        if (m_gameState == GameState::FIGHT && m_roundTimer > 0.f) {
+            m_roundTimer -= dt;
+        }
+
+        // HitStop 冻结恢复后设置 HitShakeOver
+        if (m_hitStopTimer > 0.0f) {
+            m_hitStopTimer -= dt;
+            if (m_hitStopTimer <= 0.0f && m_dummy) {
+                m_dummy->setHitShakeOver(true);
+            }
+            return;
+        }
+
+        // 1. SuperPause 检查 (从 Fighter 读取)
+        if (m_player && m_player->isInSuperPause()) {
+            m_superPauseTimer = m_player->getSuperPauseTime();
+            m_superPauseDarken = m_player->getSuperPauseDarken();
+            m_player->tickSuperPause();
+        }
+        if (m_superPauseTimer > 0) {
+            m_superPauseTimer--;
+            // 动画仍然更新，但物理和状态不更新
+            if (m_player) m_player->getAnimationPlayer().update(dt);
+            if (m_dummy) m_dummy->getAnimationPlayer().update(dt);
+            return;
+        }
+        if (m_superPauseTimer == 0) m_superPauseDarken = false;
+
+        // 2. HitStop 冻结逻辑
         if (m_hitStopTimer > 0.0f) {
             m_hitStopTimer -= dt;
             return;
         }
+
 
         // JPx 锁存：按下后保持 15 帧可见
         if (inputManager_.justPressed('x')) m_debugJpxLatch = 15;
@@ -171,17 +236,101 @@ namespace db {
             sf::Vector2f dummyPos = m_dummy ? m_dummy->getPosition() : sf::Vector2f(-9999.f, 0.f);
             int oldState = m_player->getCurrentStateNo();
             m_player->update(dt, inputManager_, dummyPos);
-            int newState = m_player->getCurrentStateNo();
-            if (oldState != newState) {
-                std::string msg = "State: " + std::to_string(oldState) + " -> " + std::to_string(newState) + "\n";
-                logMsg(msg.c_str());
+            // P1 更新后立即做命中检测(此时 HitDefs 可能刚注册)
+            if (m_dummy && !m_player->hasMoveContact()) {
+                const auto& hitDefs = m_player->getCurrentHitDefs();
+                if (!hitDefs.empty()) {
+                    sf::FloatRect hitBox = m_player->getActiveHitbox();
+                    sf::FloatRect hurtBox = m_dummy->getActiveHurtbox();
+                    static int hitDiag = 0;
+                    if (++hitDiag % 30 == 1) {
+                        std::cout << "[inlineCheck] state=" << m_player->getCurrentStateNo()
+                                  << " hitBox=" << hitBox.position.x << "," << hitBox.position.y << " " << hitBox.size.x << "x" << hitBox.size.y
+                                  << " hurtBox=" << hurtBox.position.x << "," << hurtBox.position.y << " " << hurtBox.size.x << "x" << hurtBox.size.y
+                                  << " pos=" << m_player->getPosition().x << "," << m_player->getPosition().y
+                                  << " dpos=" << m_dummy->getPosition().x << "," << m_dummy->getPosition().y
+                                  << std::endl;
+                    }
+                    if (hitBox.size.x > 0 && hitBox.size.y > 0 &&
+                        hurtBox.size.x > 0 && hurtBox.size.y > 0 &&
+                        hitBox.findIntersection(hurtBox).has_value()) {
+                        std::cout << "[inlineCheckCombat] HIT! state=" << m_player->getCurrentStateNo() << std::endl;
+                        m_player->setMoveContact(true);
+                        const auto& hit = hitDefs[0];
+                        HitInfo info;
+                        info.damage = hit.damage;
+                        info.guardDamage = hit.guardDamage;
+                        info.p1stateno = hit.p1stateno;
+                        info.p2stateno = hit.p2stateno;
+                        info.groundVelocityX = hit.groundVelocityX;
+                        m_dummy->setHitInfo(info);
+                        m_dummy->takeDamage(info.damage);
+                        float knockback = info.groundVelocityX * 60.f;
+                        m_dummy->setVelocityX(m_player->isFacingRight() ? knockback : -knockback);
+                        int targetState = info.p2stateno > 0 ? info.p2stateno : 5000;
+                        m_dummy->requestStateChange(targetState);
+                        if (info.p1stateno > 0) m_player->requestStateChange(info.p1stateno);
+                        if (hit.pausetime > 0) {
+                            m_hitStopTimer = hit.pausetime / 60.0f;
+                            m_dummy->setHitShakeOver(false);
+                        }
+                        spawnSpark(hit.sparkno, {hitBox.position.x + hitBox.size.x/2.f, hitBox.position.y + hitBox.size.y/2.f});
+                    }
+                }
             }
+            int newState = m_player->getCurrentStateNo();
         }
 
         // 3. P2 更新
         if (m_dummy) {
             sf::Vector2f playerPos = m_player->getPosition();
             m_dummy->update(dt, inputManagerP2_, playerPos);
+        }
+
+        // 3. KO 检测
+        if (m_gameState == GameState::FIGHT && m_player && m_dummy) {
+            if (m_dummy->getCurrentLife() <= 0) {
+                m_player->setMoveContact(false);
+                m_dummy->requestStateChange(5150);
+                m_player->requestStateChange(180);
+                m_gameState = GameState::KO;
+                m_koTimer = 2.5f;
+                std::cout << "[KO] P2 KO'd!" << std::endl;
+            }
+            if (m_player->getCurrentLife() <= 0) {
+                m_dummy->setMoveContact(false);
+                m_player->requestStateChange(5150);
+                m_dummy->requestStateChange(180);
+                m_gameState = GameState::KO;
+                m_koTimer = 2.5f;
+                std::cout << "[KO] P1 KO'd!" << std::endl;
+            }
+        }
+        if (m_gameState == GameState::KO) {
+            m_koTimer -= dt;
+            // KO 期间只更新动画, 冻结其他
+            if (m_player && m_koTimer > 0.f && m_koTimer < 2.0f) {
+                m_player->getAnimationPlayer().update(dt);
+                m_dummy->getAnimationPlayer().update(dt);
+            }
+            if (m_koTimer <= 0.f) {
+                // 判断谁赢了这回合
+                bool p1KO = (m_player && m_player->getCurrentLife() <= 0);
+                bool p2KO = (m_dummy && m_dummy->getCurrentLife() <= 0);
+                if (p1KO) m_p2RoundsWon++;
+                if (p2KO) m_p1RoundsWon++;
+                if (m_p1RoundsWon >= 2 || m_p2RoundsWon >= 2) {
+                    std::cout << "[MATCH] Player " << (m_p1RoundsWon >= 2 ? "1" : "2") << " wins!" << std::endl;
+                } else {
+                    resetRound();
+                    m_roundNumber++;
+                    std::cout << "[ROUND] Round " << m_roundNumber << std::endl;
+                    if (m_player) { m_player->setRoundState(1); m_player->setRoundNo(m_roundNumber); m_player->requestStateChange(5900); }
+                    if (m_dummy) { m_dummy->setRoundState(1); m_dummy->setRoundNo(m_roundNumber); m_dummy->requestStateChange(5900); }
+                    m_gameState = GameState::INTRO;
+                    m_roundTimer = 0.f;
+                }
+            }
         }
 
         // 3.25 读取并创建 Helper (飞行道具)
@@ -196,6 +345,16 @@ namespace db {
                 he.animPlayer.setFacingRight(ph.facingRight);
                 he.position = ph.position;
                 he.velocity = ph.velocity;
+                he.damage = ph.damage;
+                he.sparkno = ph.sparkno;
+                he.stateNo = ph.stateNo;        // Helper 状态号
+                he.stateRegistry = &m_player->getStateRegistry();
+                he.parent = m_player.get();
+                he.parentStateno = m_player->getCurrentStateNo();
+                if (he.stateRegistry) {
+                    const auto* sd = he.stateRegistry->getStateDef(he.stateNo);
+                    if (sd) he.sprpriority = sd->sprpriority;
+                }
                 m_helpers.push_back(std::move(he));
             }
         }
@@ -210,6 +369,11 @@ namespace db {
                 he.animPlayer.setFacingRight(ph.facingRight);
                 he.position = ph.position;
                 he.velocity = ph.velocity;
+                he.damage = ph.damage;
+                he.sparkno = ph.sparkno;
+                he.stateNo = ph.stateNo;
+                he.stateRegistry = &m_dummy->getStateRegistry();
+                he.parent = m_dummy.get();
                 m_helpers.push_back(std::move(he));
             }
         }
@@ -227,15 +391,124 @@ namespace db {
         // 4. 战斗检测
         checkCombat();
 
+        // 4.5 战斗检测后再次执行 P1 CNS (捕获 MOVECONTACT 触发的 Helper 等)
+        if (m_player && m_player->isAttacking()) {
+            m_player->executeCurrentStateCNS(nullptr, dt);
+        }
+
         // 5. 物理碰撞 (推撞)
         handlePushCollision();
 
-        // 6. 更新 Helper (飞行道具)
+        // 6. 更新 Helper (飞行道具 + CNS 执行)
         for (auto& h : m_helpers) {
+            h.animPlayer.update(dt);
+            h.stateTime += dt;
+
+
+            // 6.1 执行 Helper 的 CNS 状态 (关键控制器)
+            if (const auto* stateDef = h.stateRegistry ? h.stateRegistry->getStateDef(h.stateNo) : nullptr) {
+                int ticks = static_cast<int>(h.stateTime * 60.f);
+                for (const auto& ctrl : stateDef->controllers) {
+                    // 用父 Fighter 检查 trigger (Helper 自身没有 Fighter 状态)
+                    if (!ctrl->checkTriggers(h.parent ? *h.parent : *(m_player.get()), nullptr, ticks)) continue;
+
+                    // 手动执行关键控制器
+                    switch (ctrl->type) {
+                        case ControllerType::VELSET: {
+                            const auto* vc = dynamic_cast<const VelSetController*>(ctrl.get());
+                            if (vc && !vc->hasX && !vc->hasY) break;
+                            // 简化: 直接用 rawValue 设置速度
+                            if (vc->hasX && h.stateTime < 0.02f) {
+                                float dir = h.facingRight ? 1.f : -1.f;
+                                h.velocity.x = dir * vc->valueX;
+                            }
+                            break;
+                        }
+                        case ControllerType::POSADD: {
+                            const auto* pc = dynamic_cast<const PosAddController*>(ctrl.get());
+                            if (pc) {
+                                // 用父 Fighter 求值表达式 (如 p2dist x)
+                                Fighter* refFtr = h.parent ? h.parent : m_player.get();
+                                float addX = pc->valueX;
+                                float addY = pc->valueY;
+                                if (!pc->valueXStr.empty()) addX = static_cast<float>(evaluateCNSExpression(pc->valueXStr, *refFtr));
+                                if (!pc->valueYStr.empty()) addY = static_cast<float>(evaluateCNSExpression(pc->valueYStr, *refFtr));
+                                h.position.x += addX * (h.facingRight ? 1.f : -1.f);
+                                h.position.y += addY;
+                            }
+                            break;
+                        }
+                        case ControllerType::CHANGESTATE: {
+                            const auto* cs = dynamic_cast<const ChangeStateController*>(ctrl.get());
+                            if (cs && cs->value > 0) {
+                                h.stateNo = cs->value;
+                                h.stateTime = 0.f;
+                            }
+                            break;
+                        }
+                        case ControllerType::DESTROY_SELF: {
+                            // DestroySelf: Time = N 条件才触发，跳过未知条件(如 parent,stateno)
+                            int selfTicks = static_cast<int>(h.stateTime * 60.f);
+                            bool shouldDie = false;
+                            for (const auto& tl : ctrl->triggers) {
+                                for (const auto& c : tl.conditions) {
+                                    if (c.type == CondType::TIME && c.op == CondOp::EQ && selfTicks == c.rhsInt)
+                                        shouldDie = true;
+                                    if (c.type == CondType::TIME && c.op == CondOp::GTE && selfTicks >= c.rhsInt)
+                                        shouldDie = true;
+                                }
+                            }
+                            if (shouldDie) {
+                                h.done = true;
+                            }
+                            break;
+                        }
+                        case ControllerType::BIND_TO_ROOT: {
+                            const auto* bt = dynamic_cast<const BindToRootController*>(ctrl.get());
+                            if (bt && h.parent) {
+                                sf::Vector2f parPos = h.parent->getPosition();
+                                float dir = h.parent->isFacingRight() ? 1.f : -1.f;
+                                h.position.x = parPos.x + bt->m_posX * dir;
+                                h.position.y = parPos.y + bt->m_posY;
+                            }
+                            break;
+                        }
+                        case ControllerType::HITDEF: {
+                            // Helper 的 HitDef 不检查触发条件 (避免 hitcount 等未知变量)
+                            if (!h.hasHit && m_player && m_dummy) {
+                                const auto& hitDefs = h.stateRegistry->getHitDefs(h.stateNo);
+                                if (!hitDefs.empty()) {
+                                    for (const auto& hd : hitDefs) {
+                                        Fighter* target = h.facingRight ? m_dummy.get() : m_player.get();
+                                        sf::FloatRect hurt = target->getActiveHurtbox();
+                                        if (hurt.size.x > 0) {
+                                            sf::FloatRect hb({h.position.x - 16.f, h.position.y - 16.f}, {32.f, 32.f});
+                                            if (hb.findIntersection(hurt).has_value()) {
+                                                target->takeDamage(hd.damage);
+                                                std::cout << "[HelperHit] state=" << h.stateNo
+                                                          << " dmg=" << hd.damage
+                                                          << " pos=" << h.position.x << "," << h.position.y << std::endl;
+                                                spawnSpark(hd.sparkno > 0 ? hd.sparkno : 1200, h.position);
+                                                h.done = true;
+                                                h.hasHit = true;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            break;
+                        }
+                        default: break;
+                    }
+                }
+            }
+
+            // 6.2 移动
             h.position.x += h.velocity.x * 60.f * dt;
             h.position.y += h.velocity.y * 60.f * dt;
-            h.animPlayer.update(dt);
             h.lifetime--;
+
             // 超出屏幕或生命期结束 → 移除
             if (h.lifetime <= 0 || h.position.x < -200.f || h.position.x > 1000.f) {
                 h.done = true;
@@ -257,19 +530,22 @@ namespace db {
 
     void Game::checkCombat() {
         if (!m_player || !m_dummy || m_dummy->isDead()) return;
-        if (!m_player->isAttacking()) return;
         if (m_player->hasMoveContact()) return;
-
         const auto& hitDefs = m_player->getCurrentHitDefs();
+        static int emptyCount = 0;
         if (hitDefs.empty()) {
-            static int lastLoggedState = -1;
-            int currentState = m_player->getCurrentStateNo();
-            if (currentState != lastLoggedState) {
-                std::string msg = "No HitDefs in state " + std::to_string(currentState) + "\n";
-                logMsg(msg.c_str());
-                lastLoggedState = currentState;
+            if (++emptyCount % 60 == 1) {
+                std::cout << "[checkCombat] no HitDefs state=" << m_player->getCurrentStateNo() << std::endl;
             }
             return;
+        }
+        // Debug: 打印 hitbox 位置
+        static int cbCount = 0;
+        if (++cbCount % 30 == 1) {
+            sf::FloatRect hb = m_player->getActiveHitbox();
+            sf::FloatRect hr = m_dummy->getActiveHurtbox();
+            std::cout << "[CB] hitbox=" << hb.position.x << "," << hb.position.y << " " << hb.size.x << "x" << hb.size.y
+                      << " hurtbox=" << hr.position.x << "," << hr.position.y << " " << hr.size.x << "x" << hr.size.y << std::endl;
         }
 
         const auto& hit = hitDefs[0];
@@ -291,6 +567,7 @@ namespace db {
         auto intersection = hitBox.findIntersection(hurtBox);
         if (!intersection.has_value()) return;
 
+        std::cout << "[checkCombat] HIT! state=" << m_player->getCurrentStateNo() << std::endl;
         m_player->setMoveContact(true);
 
         // 计算命中接触点 (碰撞矩形中心 + sparkxy 偏移)
@@ -322,6 +599,7 @@ namespace db {
         info.airguardVelocityX = hit.airguardVelocityX;
         info.airguardVelocityY = hit.airguardVelocityY;
         info.animtype = hit.animtype.empty() ? "Light" : hit.animtype;
+        info.p1stateno = hit.p1stateno;
         info.p2stateno = hit.p2stateno;
         info.fall = hit.fall;
         info.fallrecover = hit.fallRecover;
@@ -364,6 +642,11 @@ namespace db {
                 else targetState = 5002;
             }
             m_dummy->requestStateChange(targetState);
+
+            // P1STATENO: 攻击方命中后强制跳转状态 (连段链)
+            if (info.p1stateno > 0) {
+                m_player->requestStateChange(info.p1stateno);
+            }
 
             if (hit.pausetime > 0) {
                 m_hitStopDuration = hit.pausetime;
@@ -415,23 +698,36 @@ namespace db {
 
         window_.clear(sf::Color(200, 200, 200));
 
-        if (m_player) m_player->draw(window_);
-        if (m_dummy) m_dummy->draw(window_);
-
-        // 绘制 Helper (飞行道具)
+        // Helpers + Sparks 画在角色之前
         for (const auto& h : m_helpers) {
             h.animPlayer.draw(window_, h.position);
         }
-
-        // 绘制火花效果
         for (const auto& spark : m_sparks) {
             spark.animPlayer.draw(window_, spark.position);
         }
+
+        // 角色在最上面
+        if (m_player) m_player->draw(window_);
+        if (m_dummy) m_dummy->draw(window_);
 
         // HUD 用默认视图 (不震动)
         window_.setView(window_.getDefaultView());
         if (m_hudP1) m_hudP1->draw(window_);
         if (m_hudP2) m_hudP2->draw(window_);
+
+        // 回合/比赛信息
+        if (m_player) {
+            char buf[32];
+            snprintf(buf, sizeof(buf), "Round %d", m_roundNumber);
+            sf::Text roundText(m_debugFont);
+            roundText.setString(buf);
+            roundText.setCharacterSize(24);
+            roundText.setFillColor(sf::Color::White);
+            sf::FloatRect tb2 = roundText.getLocalBounds();
+            roundText.setOrigin({tb2.position.x + tb2.size.x/2.f, tb2.position.y + tb2.size.y/2.f});
+            roundText.setPosition({400.f, 60.f});
+            window_.draw(roundText);
+        }
 
         // 调试信息：显示当前状态、动画ID、命令状态
         if (m_debugReady && m_player) {
@@ -484,7 +780,49 @@ namespace db {
             window_.draw(dirText);
         }
 
+        // SuperPause 暗化效果
+        if (m_superPauseDarken) {
+            sf::RectangleShape dark({800.f, 600.f});
+            dark.setFillColor({0, 0, 0, 120});  // 半透明黑
+            window_.draw(dark);
+        }
+
+        if (m_player && m_dummy) {
+            // KO 文字
+            if (m_gameState == GameState::KO) {
+                sf::Text koText(m_debugFont);
+                koText.setString("K.O.!");
+                koText.setCharacterSize(60);
+                koText.setFillColor(sf::Color::Red);
+                sf::FloatRect tb = koText.getLocalBounds();
+                koText.setOrigin({tb.position.x + tb.size.x/2.f, tb.position.y + tb.size.y/2.f});
+                koText.setPosition({400.f, 200.f});
+                window_.draw(koText);
+            }
+        }
+
         window_.display();
+    }
+
+    void Game::resetRound() {
+        if (!m_player || !m_dummy) return;
+        m_player->setRoundState(1);
+        m_dummy->setRoundState(1);
+        m_player->setRoundNo(m_roundNumber);
+        m_dummy->setRoundNo(m_roundNumber);
+        m_player->requestStateChange(5900);
+        m_dummy->requestStateChange(5900);
+        m_player->resetLife();
+        m_dummy->resetLife();
+        float p1Y = 480.f - static_cast<float>(m_player->getAnimationPlayer().getCurrentFrame().offset.y);
+        float p2Y = 480.f - static_cast<float>(m_dummy->getAnimationPlayer().getCurrentFrame().offset.y);
+        m_player->setPosition(200.f, p1Y);
+        m_dummy->setPosition(600.f, p2Y);
+        m_helpers.clear();
+        m_sparks.clear();
+        m_hitStopTimer = 0.f;
+        m_superPauseTimer = 0;
+        m_superPauseDarken = false;
     }
 
 } // namespace db

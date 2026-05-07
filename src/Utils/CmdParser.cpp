@@ -281,9 +281,30 @@ namespace db {
             // 检查第一个 token
             const auto& t0 = tokens[0];
             switch (t0.type) {
-                case CommandToken::DIR:
-                    firstHeld = input.isDirHeld(strToDir(t0.value));
+                case CommandToken::DIR: {
+                    // 检查当前帧 + 历史帧 (M.U.G.E.N 标准: 方向在 command.time 帧内出现过即匹配)
+                    // 同时使用 4-way 匹配 (F 匹配 F|UF|DF)
+                    DirInput targetDir = strToDir(t0.value);
+                    auto dirMatch = [&](DirInput d) -> bool {
+                        if (d == targetDir) return true;
+                        if (t0.value == "F") return d == DirInput::UF || d == DirInput::DF;
+                        if (t0.value == "B") return d == DirInput::UB || d == DirInput::DB;
+                        if (t0.value == "D") return d == DirInput::DF || d == DirInput::DB;
+                        if (t0.value == "U") return d == DirInput::UF || d == DirInput::UB;
+                        return false;
+                    };
+                    firstHeld = dirMatch(input.getDirection());
+                    if (!firstHeld) {
+                        for (int i = 1; i <= std::min(cmd.time, 60); i++) {
+                            auto frame = input.getFrame(i);
+                            if (dirMatch(frame.dir)) {
+                                firstHeld = true;
+                                break;
+                            }
+                        }
+                    }
                     break;
+                }
                 case CommandToken::HOLD_DIR: {
                     // 映射方向到 hold 名称
                     std::string dirLower = toLower(t0.value);

@@ -1,4 +1,5 @@
 #include "Utils/AirParser.h"
+#include "Utils/SFFDatabase.h"
 #include <sstream>
 #include <iostream>
 #include <algorithm>
@@ -62,6 +63,14 @@ namespace {
 std::map<int, Animation> AirParser::parse(const std::string& filePath,
                                           const std::string& basePath,
                                           const std::string& prefix) {
+    // 加载 SFF 轴数据库 (懒加载，仅首次成功加载后不再重复)
+    // 数据库文件在角色根目录 (basePath 是 Sprites/ 子目录，需要回退一层)
+    auto& sffDb = SFFDatabase::getInstance();
+    std::string dbPath = basePath + "../sprite_database_" + prefix + ".txt";
+    if (!sffDb.lookup(0, 1)) {
+        sffDb.load(dbPath);
+    }
+
     std::map<int, Animation> animations;
     std::ifstream file(filePath);
 
@@ -173,6 +182,14 @@ std::map<int, Animation> AirParser::parse(const std::string& filePath,
                         .clsn1 = nextClsn1,
                         .clsn2 = nextClsn2
                     };
+
+                    // 用 SFF 轴数据修正 offset 并存储 raw axis
+                    if (auto* sffData = sffDb.lookup(g, n)) {
+                        frame.offset.x = -sffData->axisX;
+                        frame.offset.y = sffData->height - sffData->axisY;
+                        frame.axisX = sffData->axisX;
+                        frame.axisY = sffData->axisY;
+                    }
 
                     if (frame.clsn2.empty() && !defaultClsn2.empty()) frame.clsn2 = defaultClsn2;
 

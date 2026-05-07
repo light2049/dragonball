@@ -20,6 +20,7 @@ add_executable(DragonBall
         src/Characters/Dummy.cpp
         src/Utils/CNSController.cpp
         src/Utils/CmdParser.cpp
+        src/Utils/SFFDatabase.cpp
         src/Core/StateRegistry.cpp
 )
 

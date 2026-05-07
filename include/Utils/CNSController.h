@@ -24,6 +24,7 @@ namespace db {
         STATETYPE,      // statetype = S/C/A
         STATENO,        // stateno = N
         PREVSTATENO,    // prevstateno = N
+        ROUNDSTATE,     // roundstate = N (0=开场, 1=战斗中)
         MOVECONTACT,    // movecontact (布尔)
         MOVEHIT,        // movehit (布尔)
         MOVEGUARDED,    // moveguarded
@@ -37,7 +38,6 @@ namespace db {
         POS_Y,          // pos y
         RANDOM,         // random
         SELFANIMEXIST,  // SelfAnimExist(N)
-        ROUNDSTATE,     // RoundState = N
         MATCHOVER,      // MatchOver (布尔)
         ROUNDNO,        // roundno = N
         INGUARDDIST,    // inguarddist (布尔)
@@ -147,6 +147,11 @@ namespace db {
         CTRL_NULL,
         ENVSHAKE,
         HELPER,
+        SUPERPAUSE,
+        BIND_TO_ROOT,
+        DESTROY_SELF,
+        ANGLEDRAW,
+        TRANS,
     };
 
     class CNSController {
@@ -296,6 +301,36 @@ namespace db {
         void execute(Fighter& fighter, InputManager* inputMgr, float dt) const override;
     };
 
+    class VarRangeSetController : public CNSController {
+    public:
+        VarRangeSetController();
+        void parse(const std::string& key, const std::string& value) override;
+        void execute(Fighter& fighter, InputManager* inputMgr, float dt) const override;
+        int m_value = 0;
+    };
+
+    class AssertSpecialController : public CNSController {
+    public:
+        AssertSpecialController();
+        void parse(const std::string& key, const std::string& value) override;
+        void execute(Fighter& fighter, InputManager* inputMgr, float dt) const override;
+    };
+
+    class AngleDrawController : public CNSController {
+    public:
+        AngleDrawController();
+        void parse(const std::string& key, const std::string& value) override;
+        void execute(Fighter& fighter, InputManager* inputMgr, float dt) const override;
+        float m_scaleX = 1.f, m_scaleY = 1.f;
+    };
+
+    class TransController : public CNSController {
+    public:
+        TransController();
+        void parse(const std::string& key, const std::string& value) override;
+        void execute(Fighter& fighter, InputManager* inputMgr, float dt) const override;
+    };
+
     // --- EnvShake ---
     class EnvShakeController : public CNSController {
     public:
@@ -330,6 +365,7 @@ namespace db {
         int m_removetime = -2;
         int m_sprpriority = 0;
         float m_scaleX = 1.f, m_scaleY = 1.f;
+        bool m_removeOnGetHit = false;
     };
 
     // --- RemoveExplod ---
@@ -365,6 +401,38 @@ namespace db {
         int m_framegap = 1;
         int m_length = 3;
     };
+
+    // --- SuperPause ---
+    class SuperPauseController : public CNSController {
+    public:
+        SuperPauseController();
+        void parse(const std::string& key, const std::string& value) override;
+        void execute(Fighter& fighter, InputManager* inputMgr, float dt) const override;
+        int m_time = 0;
+        int m_posX = 0, m_posY = 0;
+        int m_darken = 0;
+    };
+
+    // --- DestroySelf (Helper 自毁) ---
+    class DestroySelfController : public CNSController {
+    public:
+        DestroySelfController();
+        void parse(const std::string& key, const std::string& value) override;
+        void execute(Fighter& fighter, InputManager* inputMgr, float dt) const override;
+    };
+
+    // --- BindToRoot (挂载到父人物) ---
+    class BindToRootController : public CNSController {
+    public:
+        BindToRootController();
+        void parse(const std::string& key, const std::string& value) override;
+        void execute(Fighter& fighter, InputManager* inputMgr, float dt) const override {}
+        int m_posX = 0, m_posY = 0;
+    };
+
+    // CNS 表达式求值 (p2dist, const(), etc.)
+    class Fighter;
+    int evaluateCNSExpression(const std::string& expr, const Fighter& fighter);
 
     // 工厂函数
     std::unique_ptr<CNSController> createController(ControllerType type);

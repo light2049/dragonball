@@ -35,6 +35,11 @@ namespace db {
         return m_states.find(stateNo) != m_states.end();
     }
 
+    const StateDef* StateRegistry::getStateDef(int stateNo) const {
+        auto it = m_states.find(stateNo);
+        return (it != m_states.end()) ? &it->second : nullptr;
+    }
+
     void StateRegistry::executeState(int stateNo, Fighter& fighter, InputManager* inputMgr, float dt) {
         auto it = m_states.find(stateNo);
         if (it == m_states.end()) return;
@@ -42,12 +47,15 @@ namespace db {
         const StateDef& stateDef = it->second;
 
         for (const auto& ctrl : stateDef.controllers) {
-            // 检查触发条件
+            // 如果状态已变更 (ChangeState 已触发), 停止执行当前状态
+            int currentState = fighter.getCurrentStateNo();
             int stateTime = fighter.getStateTime();
             if (!ctrl->checkTriggers(fighter, inputMgr, stateTime)) continue;
 
-            // ✅ 触发条件满足 → 执行控制器
             ctrl->execute(fighter, inputMgr, dt);
+
+            // ChangeState 执行后立即停止
+            if (fighter.getCurrentStateNo() != currentState) break;
         }
     }
 

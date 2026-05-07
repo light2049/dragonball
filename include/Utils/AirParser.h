@@ -35,6 +35,8 @@ namespace db {
         std::string texturePath;
         int duration;
         sf::Vector2i offset;
+        int axisX = 0;     // SFF 轴 X (纹理像素)
+        int axisY = 0;     // SFF 轴 Y (纹理像素)
         bool flipX;
         BlendMode blendMode = BlendMode::Normal;
         std::vector<ClsnRect> clsn1;

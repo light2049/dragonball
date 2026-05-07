@@ -41,6 +41,7 @@ namespace db {
     struct HitDef {
         int damage = 0;              // 基础伤害
         int guardDamage = 0;         // 防御伤害
+        int p1stateno = 0;           // 攻击方命中后跳转状态(连段用)
         int p2stateno = 0;           // 受击方跳转状态
         int pausetime = 0;           // 命中停顿
         int guardPausetime = 0;      // 防御停顿
@@ -104,6 +105,7 @@ namespace db {
         float velsetY = 0.f;
         int poweradd = 0;            // 新增：进入状态增加的 Power
         int anim = -1;               // 状态默认动画 (-1=不切换)
+        int sprpriority = 0;          // 绘制层级
         std::vector<std::unique_ptr<CNSController>> controllers;
         std::vector<HitDef> hitDefs;
     };

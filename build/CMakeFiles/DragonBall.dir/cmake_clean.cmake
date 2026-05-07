@@ -25,6 +25,8 @@ file(REMOVE_RECURSE
   "CMakeFiles/DragonBall.dir/src/Utils/CmdParser.cpp.obj.d"
   "CMakeFiles/DragonBall.dir/src/Utils/CnsParser.cpp.obj"
   "CMakeFiles/DragonBall.dir/src/Utils/CnsParser.cpp.obj.d"
+  "CMakeFiles/DragonBall.dir/src/Utils/SFFDatabase.cpp.obj"
+  "CMakeFiles/DragonBall.dir/src/Utils/SFFDatabase.cpp.obj.d"
   "DragonBall.exe"
   "DragonBall.exe.manifest"
   "DragonBall.pdb"

@@ -257,7 +257,9 @@ namespace db {
                 else if (lowerKey == "anim") {
                     try { states[currentStateNo].anim = std::stoi(value); } catch (...) {}
                 }
-                // sprpriority, facep2, juggle 等暂不处理
+                else if (lowerKey == "sprpriority") {
+                    try { states[currentStateNo].sprpriority = std::stoi(value); } catch (...) {}
+                }
                 continue;
             }
 
@@ -341,6 +343,9 @@ namespace db {
                     auto p = parsePair<int>(value);
                     hit.damage = p.first;
                     hit.guardDamage = p.second;
+                }
+                else if (lowerKey == "p1stateno") {
+                    try { hit.p1stateno = std::stoi(value); } catch (...) {}
                 }
                 else if (lowerKey == "p2stateno") {
                     try { hit.p2stateno = std::stoi(value); } catch (...) {}
