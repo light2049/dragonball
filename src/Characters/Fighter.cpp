@@ -351,7 +351,7 @@ namespace db {
         // ==========================================
         bool inputActive = m_hasControl;
         float distToOpponent = std::abs(opponentPos.x - m_position.x);
-        bool inGuardRange = distToOpponent < 80.f;
+        bool inGuardRange = isInGuardDist();
 
         // M.U.G.E.N 标准方向输入: holdfwd/holdback 是屏幕绝对方向
         bool fwd = inputMgr.isHeld("holdfwd");
@@ -969,16 +969,14 @@ namespace db {
     }
 
     bool Fighter::isInGuardDist() const {
-        // 简化的防御距离检测: 对方在 80px 内时进入防御判定
-        // M.U.G.E.N 规范中由 guard.dist 参数控制
-        // 这里使用当前帧动画的 pushbox 宽度作为参考
+        float distX = std::abs(m_opponentPos.x - m_position.x);
         float guardRange = m_pushFront + m_pushBack + 80.f;
-        return true; // 简化: 总是返回 true, 实际由状态切换逻辑判断
+        return distX <= guardRange;
     }
 
     bool Fighter::isGuarding() const {
-        // Mugen 规范：120-132 是防御相关状态
-        return (m_currentStateNo >= 120 && m_currentStateNo <= 132);
+        // M.U.G.E.N 规范: 120-155 是防御相关状态 (含防御受击 150-155)
+        return (m_currentStateNo >= 120 && m_currentStateNo <= 155);
     }
 
     void Fighter::addPower(int amount) {
