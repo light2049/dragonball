@@ -23,6 +23,7 @@ namespace db {
         m_currentFrameIndex = 0;
         m_currentTime = 0.0f;
         m_justLooped = false;
+        m_animTimeRemaining = getTotalAnimTicks();
         updateFrame();
 
         if (!s_loggedPlay.contains(newId)) {
@@ -34,6 +35,10 @@ namespace db {
     int AnimationPlayer::getCurrentAnimId() const {
         if (!m_currentAnimation) return -1;
         return m_currentAnimation->id;
+    }
+
+    void AnimationPlayer::tickAnimTime() {
+        if (m_animTimeRemaining > 0) m_animTimeRemaining--;
     }
 
     void AnimationPlayer::update(float dt) {
@@ -87,7 +92,7 @@ namespace db {
         }
     }
 
-    void AnimationPlayer::draw(sf::RenderWindow& window, const sf::Vector2f& position) const {
+    void AnimationPlayer::draw(sf::RenderWindow& window, const sf::Vector2f& position, const DrawOverrides* overrides) const {
         if (!m_sprite) return;
 
         sf::Sprite tempSprite(*m_sprite);
@@ -101,16 +106,29 @@ namespace db {
             blendMode = frame.blendMode;
         }
 
-        // 轴对齐: 精灵的轴 (axisX, axisY) 对齐到 position，受缩放影响
-        float renderScaleX = (m_facingRight ? 1.0f : -1.0f) * m_scaleX;
-        float finalX = position.x - axisX * renderScaleX;
-        float finalY = position.y - axisY * m_scaleY;
+        // 应用 AngleDraw scale 覆盖
+        float extraScaleX = overrides ? overrides->scaleX : 1.f;
+        float extraScaleY = overrides ? overrides->scaleY : 1.f;
 
-        tempSprite.setScale({ renderScaleX, m_scaleY });
+        // 轴对齐: 精灵的轴 (axisX, axisY) 对齐到 position，受缩放影响
+        float renderScaleX = (m_facingRight ? 1.0f : -1.0f) * m_scaleX * extraScaleX;
+        float finalX = position.x - axisX * renderScaleX;
+        float finalY = position.y - axisY * m_scaleY * extraScaleY;
+
+        tempSprite.setScale({ renderScaleX, m_scaleY * extraScaleY });
         tempSprite.setPosition({finalX, finalY});
 
+        // 应用 Trans alpha 覆盖
+        if (overrides) {
+            sf::Color c = tempSprite.getColor();
+            c.a = overrides->alpha;
+            tempSprite.setColor(c);
+        }
+
         sf::RenderStates states;
-        if (blendMode == BlendMode::Additive) {
+        if (overrides && overrides->useAdditiveBlend) {
+            states.blendMode = sf::BlendAdd;
+        } else if (blendMode == BlendMode::Additive) {
             states.blendMode = sf::BlendAdd;
         } else if (blendMode == BlendMode::Subtractive) {
             states.blendMode = sf::BlendMode(sf::BlendMode::Factor::One, sf::BlendMode::Factor::One, sf::BlendMode::Equation::ReverseSubtract);
@@ -165,12 +183,13 @@ namespace db {
     bool AnimationPlayer::isFacingRight() const { return m_facingRight; }
     void AnimationPlayer::setFacingRight(bool right) { m_facingRight = right; }
 
-    int AnimationPlayer::getAnimTime() const {
+    int AnimationPlayer::getTotalAnimTicks() const {
         if (!m_currentAnimation || m_currentAnimation->frames.empty()) return 0;
-        // 返回从当前帧到动画结束的剩余帧数
-        // 0 表示已在最后一帧或已循环
-        if (m_currentFrameIndex >= m_currentAnimation->frames.size() - 1) return 0;
-        return static_cast<int>(m_currentAnimation->frames.size() - 1 - m_currentFrameIndex);
+        int total = 0;
+        for (const auto& f : m_currentAnimation->frames) {
+            total += f.duration;
+        }
+        return total;
     }
 
     sf::Vector2f AnimationPlayer::getSpriteSize() const {

@@ -252,6 +252,16 @@ namespace db {
                 break;
             }
 
+            case CondType::PARENT_STATENO: {
+                int ps = fighter.getCurrentStateNo();
+                switch (op) {
+                    case CondOp::EQ:  result = (ps == rhsInt); break;
+                    case CondOp::NEQ: result = (ps != rhsInt); break;
+                    default: result = (ps == rhsInt);
+                }
+                break;
+            }
+
             case CondType::MOVECONTACT: {
                 result = fighter.hasMoveContact();
                 break;
@@ -607,6 +617,10 @@ namespace db {
             }
             else if (lhsLower == "prevstateno") {
                 cond.type = CondType::PREVSTATENO;
+                try { cond.rhsInt = std::stoi(rhs); } catch(...) { cond.rhsInt = 0; }
+            }
+            else if (lhsLower == "parent,stateno") {
+                cond.type = CondType::PARENT_STATENO;
                 try { cond.rhsInt = std::stoi(rhs); } catch(...) { cond.rhsInt = 0; }
             }
             else if (lhsLower == "power") {
@@ -1116,7 +1130,8 @@ namespace db {
         type = ControllerType::VARADD;
     }
     void VarAddController::execute(Fighter& fighter, InputManager* inputMgr, float dt) const {
-        // 变量增加
+        int cur = fighter.getSysVar(paramInt);
+        fighter.setSysVar(paramInt, cur + value);
     }
 
     // --- NotHitBy ---
@@ -1341,6 +1356,7 @@ namespace db {
                   << " moveContact=" << fighter.hasMoveContact()
                   << " moveHit=" << fighter.hasMoveHit() << std::endl;
         ph.facingRight = (m_facing == 1) ? fighter.isFacingRight() : !fighter.isFacingRight();
+        ph.parentStateno = fighter.getCurrentStateNo();
         // 从攻击者的 HitDef 取伤害和火花
         const auto& hitDefs = fighter.getCurrentHitDefs();
         if (!hitDefs.empty()) {
@@ -1478,10 +1494,43 @@ namespace db {
     TransController::TransController() {
         type = ControllerType::TRANS;
     }
-    void TransController::parse(const std::string& key, const std::string& value) {}
-    void TransController::execute(Fighter& fighter, InputManager* inputMgr, float dt) const {}
+    void TransController::parse(const std::string& key, const std::string& value) {
+        std::string lowerKey = key;
+        std::transform(lowerKey.begin(), lowerKey.end(), lowerKey.begin(), ::tolower);
+        if (lowerKey == "trans") {
+            m_transType = value;
+            std::transform(m_transType.begin(), m_transType.end(), m_transType.begin(), ::tolower);
+        } else if (lowerKey == "alpha") {
+            size_t comma = value.find(',');
+            if (comma != std::string::npos) {
+                std::string srcStr = value.substr(0, comma);
+                std::string dstStr = value.substr(comma + 1);
+                // 尝试解析为纯数字，失败则存为表达式
+                try {
+                    size_t pos = 0;
+                    m_alphaSrc = std::stoi(srcStr, &pos);
+                    if (pos < srcStr.size()) { m_alphaSrcExpr = srcStr; m_alphaSrc = 0; }
+                } catch (...) { m_alphaSrcExpr = srcStr; m_alphaSrc = 0; }
+                try {
+                    size_t pos = 0;
+                    m_alphaDst = std::stoi(dstStr, &pos);
+                    if (pos < dstStr.size()) { m_alphaDstExpr = dstStr; m_alphaDst = 256; }
+                } catch (...) { m_alphaDstExpr = dstStr; m_alphaDst = 256; }
+            }
+        }
+    }
+    void TransController::execute(Fighter& fighter, InputManager* inputMgr, float dt) const {
+        auto& overrides = fighter.getDrawOverrides();
+        // 仅设置 alpha 透明度，不使用 additive 混合（与 Explod 一致）
+        int src = std::max(0, std::min(256, m_alphaSrc));
+        overrides.alpha = static_cast<uint8_t>((src * 255) / 256);
+    }
     void AssertSpecialController::execute(Fighter& fighter, InputManager* inputMgr, float dt) const {}
     void DestroySelfController::execute(Fighter& fighter, InputManager* inputMgr, float dt) const {}
-    void AngleDrawController::execute(Fighter& fighter, InputManager* inputMgr, float dt) const {}
+    void AngleDrawController::execute(Fighter& fighter, InputManager* inputMgr, float dt) const {
+        auto& overrides = fighter.getDrawOverrides();
+        overrides.scaleX = m_scaleX;
+        overrides.scaleY = m_scaleY;
+    }
 
 } // namespace db

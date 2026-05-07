@@ -54,6 +54,7 @@ namespace db {
         MOVETYPE,       // movetype = I/A/H
         COMMAND_COUNT,  // command != "xxx" 等
         HITFALL,        // HitFall (布尔)
+        PARENT_STATENO, // parent,stateno = N
         // 字面量 (用于比较)
         LITERAL_TRUE,   // 永真
         LITERAL_FALSE,  // 永假
@@ -329,6 +330,11 @@ namespace db {
         TransController();
         void parse(const std::string& key, const std::string& value) override;
         void execute(Fighter& fighter, InputManager* inputMgr, float dt) const override;
+        std::string m_transType;
+        int m_alphaSrc = 256;
+        int m_alphaDst = 256;
+        std::string m_alphaSrcExpr;  // 表达式字符串 (含 time 等变量)
+        std::string m_alphaDstExpr;
     };
 
     // --- EnvShake ---

@@ -36,6 +36,9 @@ namespace db {
         int parentStateno = 0;  // 创建时的父状态, 父状态改变后销毁
         // 执行过 HitDef 避免一帧多次判定
         bool hitDefFired = false;
+        bool firstUpdate = true;  // 创建后的首次更新 (跳过 DestroySelf)
+        // 每帧绘制覆盖 (由 AngleDraw / Trans 控制器设置)
+        DrawOverrides drawOverrides;
     };
 
     class Game {

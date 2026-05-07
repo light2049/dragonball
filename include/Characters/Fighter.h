@@ -67,6 +67,7 @@ namespace db {
         // 新的 update 重载: 使用 InputManager (支持 CMD 指令检测)
         void update(float dt, class InputManager& inputMgr, const sf::Vector2f& opponentPos);
         void draw(sf::RenderWindow& window) const;
+        void drawDebug(sf::RenderWindow& window) const;
 
         void requestStateChange(int stateNo);
 
@@ -159,6 +160,7 @@ namespace db {
 
         // 上一个状态号
         int getPreviousStateNo() const { return m_previousStateNo; }
+        int getFrameStartState() const { return m_frameStartState; }
 
         // 当前动画 ID
         int getCurrentAnimId() const { return m_animationPlayer.getCurrentAnimId(); }
@@ -237,6 +239,10 @@ namespace db {
 
         // SuperPause
         void setSuperPause(int time, bool darken);
+
+        // ✅ 绘制覆盖 (每帧)
+        DrawOverrides& getDrawOverrides() { return m_drawOverrides; }
+        const DrawOverrides& getDrawOverrides() const { return m_drawOverrides; }
         bool isInSuperPause() const { return m_superPauseTime > 0; }
         int getSuperPauseTime() const { return m_superPauseTime; }
         bool getSuperPauseDarken() const { return m_superPauseDarken; }
@@ -270,6 +276,7 @@ namespace db {
             bool facingRight = true;
             int damage = 20;
             int sparkno = 1200;
+            int parentStateno = 0;  // 创建时的父状态号
         };
         void addPendingHelper(const PendingHelper& ph);
         std::vector<PendingHelper> drainPendingHelpers();
@@ -329,6 +336,12 @@ namespace db {
         int m_roundNo = 1;
         sf::Vector2f m_opponentPos;  // 对手位置(用于 CNS 表达式)
         mutable std::vector<HitDef> m_lastAttackHitDefs; // 保留上帧攻击的 HitDefs
+
+        // ✅ 记录帧开始时的状态号 (供 Helper 的 parent,stateno 使用)
+        int m_frameStartState = 0;
+
+        // ✅ 每帧绘制覆盖 (由 AngleDraw / Trans 控制器设置)
+        DrawOverrides m_drawOverrides;
 
         // ✅ Explod 特效实例列表
         std::vector<ExplodInstance> m_explods;

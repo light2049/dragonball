@@ -337,6 +337,15 @@ namespace db {
         if (m_player) {
             auto pending = m_player->drainPendingHelpers();
             for (auto& ph : pending) {
+                // 去重: 同父对象同 ID 的 Helper 已存在则跳过
+                bool exists = false;
+                for (const auto& existing : m_helpers) {
+                    if (existing.id == ph.id && !existing.done && existing.parent == m_player.get()) {
+                        exists = true; break;
+                    }
+                }
+                if (exists) continue;
+
                 const Animation* anim = m_player->getAnimation(ph.animId);
                 if (!anim) continue;
                 HelperEntity he;
@@ -350,7 +359,7 @@ namespace db {
                 he.stateNo = ph.stateNo;        // Helper 状态号
                 he.stateRegistry = &m_player->getStateRegistry();
                 he.parent = m_player.get();
-                he.parentStateno = m_player->getCurrentStateNo();
+                he.parentStateno = ph.parentStateno;
                 if (he.stateRegistry) {
                     const auto* sd = he.stateRegistry->getStateDef(he.stateNo);
                     if (sd) he.sprpriority = sd->sprpriority;
@@ -361,6 +370,13 @@ namespace db {
         if (m_dummy) {
             auto pending = m_dummy->drainPendingHelpers();
             for (auto& ph : pending) {
+                bool exists = false;
+                for (const auto& existing : m_helpers) {
+                    if (existing.id == ph.id && !existing.done && existing.parent == m_dummy.get()) {
+                        exists = true; break;
+                    }
+                }
+                if (exists) continue;
                 const Animation* anim = m_dummy->getAnimation(ph.animId);
                 if (!anim) continue;
                 HelperEntity he;
@@ -374,6 +390,7 @@ namespace db {
                 he.stateNo = ph.stateNo;
                 he.stateRegistry = &m_dummy->getStateRegistry();
                 he.parent = m_dummy.get();
+                he.parentStateno = ph.parentStateno;
                 m_helpers.push_back(std::move(he));
             }
         }
@@ -403,6 +420,9 @@ namespace db {
         for (auto& h : m_helpers) {
             h.animPlayer.update(dt);
             h.stateTime += dt;
+            bool isFirstUpdate = h.firstUpdate;
+            h.firstUpdate = false;  // 首次更新后清除标记
+            h.drawOverrides = DrawOverrides(); // 重置每帧绘制覆盖
 
 
             // 6.1 执行 Helper 的 CNS 状态 (关键控制器)
@@ -447,15 +467,25 @@ namespace db {
                             break;
                         }
                         case ControllerType::DESTROY_SELF: {
-                            // DestroySelf: Time = N 条件才触发，跳过未知条件(如 parent,stateno)
+                            if (isFirstUpdate) break;
                             int selfTicks = static_cast<int>(h.stateTime * 60.f);
                             bool shouldDie = false;
                             for (const auto& tl : ctrl->triggers) {
                                 for (const auto& c : tl.conditions) {
-                                    if (c.type == CondType::TIME && c.op == CondOp::EQ && selfTicks == c.rhsInt)
-                                        shouldDie = true;
-                                    if (c.type == CondType::TIME && c.op == CondOp::GTE && selfTicks >= c.rhsInt)
-                                        shouldDie = true;
+                                    if (c.type == CondType::TIME) {
+                                        if (c.op == CondOp::EQ && selfTicks == c.rhsInt) shouldDie = true;
+                                        if (c.op == CondOp::GTE && selfTicks >= c.rhsInt) shouldDie = true;
+                                    }
+                                    if (c.type == CondType::ANIMTIME && c.op == CondOp::EQ) {
+                                        if (h.animPlayer.getAnimTime() == c.rhsInt) shouldDie = true;
+                                    }
+                                    if (c.type == CondType::PARENT_STATENO && c.op == CondOp::NEQ && h.parent) {
+                                        // 使用帧开始时的父状态号 (避免同帧 ChangeState 的干扰)
+                                        if (h.parent->getFrameStartState() != c.rhsInt) shouldDie = true;
+                                    }
+                                    if (c.type == CondType::PARENT_STATENO && c.op == CondOp::EQ && h.parent) {
+                                        if (h.parent->getFrameStartState() == c.rhsInt) shouldDie = true;
+                                    }
                                 }
                             }
                             if (shouldDie) {
@@ -499,6 +529,35 @@ namespace db {
                             }
                             break;
                         }
+                        case ControllerType::ANGLEDRAW: {
+                            const auto* ad = dynamic_cast<const AngleDrawController*>(ctrl.get());
+                            if (ad) {
+                                h.drawOverrides.scaleX = ad->m_scaleX;
+                                h.drawOverrides.scaleY = ad->m_scaleY;
+                            }
+                            break;
+                        }
+                        case ControllerType::TRANS: {
+                            const auto* tc = dynamic_cast<const TransController*>(ctrl.get());
+                            if (tc) {
+                                int alphaSrc = tc->m_alphaSrc;
+                                // 表达式求值: 替换 time 为状态帧数
+                                if (!tc->m_alphaSrcExpr.empty()) {
+                                    std::string expr = tc->m_alphaSrcExpr;
+                                    std::string timeStr = std::to_string(ticks);
+                                    size_t pos = 0;
+                                    while ((pos = expr.find("time", pos)) != std::string::npos) {
+                                        expr.replace(pos, 4, timeStr);
+                                        pos += timeStr.length();
+                                    }
+                                    Fighter& eFtr = h.parent ? *h.parent : *m_player;
+                                    alphaSrc = evaluateCNSExpression(expr, eFtr);
+                                }
+                                int src = std::max(0, std::min(256, alphaSrc));
+                                h.drawOverrides.alpha = static_cast<uint8_t>((src * 255) / 256);
+                            }
+                            break;
+                        }
                         default: break;
                     }
                 }
@@ -507,10 +566,9 @@ namespace db {
             // 6.2 移动
             h.position.x += h.velocity.x * 60.f * dt;
             h.position.y += h.velocity.y * 60.f * dt;
-            h.lifetime--;
 
-            // 超出屏幕或生命期结束 → 移除
-            if (h.lifetime <= 0 || h.position.x < -200.f || h.position.x > 1000.f) {
+            // 超出屏幕 → 移除 (lifetime 由 DestroySelf 控制, 不过期自动删除)
+            if (h.position.x < -200.f || h.position.x > 1000.f) {
                 h.done = true;
             }
         }
@@ -698,17 +756,26 @@ namespace db {
 
         window_.clear(sf::Color(200, 200, 200));
 
-        // Helpers + Sparks 画在角色之前
-        for (const auto& h : m_helpers) {
-            h.animPlayer.draw(window_, h.position);
+        // Helper 按 sprpriority 排序 (让低优先级的画在底层)
+        std::vector<const HelperEntity*> sortedHelpers;
+        sortedHelpers.reserve(m_helpers.size());
+        for (const auto& h : m_helpers) sortedHelpers.push_back(&h);
+        std::sort(sortedHelpers.begin(), sortedHelpers.end(),
+            [](const HelperEntity* a, const HelperEntity* b) { return a->sprpriority < b->sprpriority; });
+        for (const auto* h : sortedHelpers) {
+            h->animPlayer.draw(window_, h->position, &h->drawOverrides);
         }
         for (const auto& spark : m_sparks) {
             spark.animPlayer.draw(window_, spark.position);
         }
-
-        // 角色在最上面
         if (m_player) m_player->draw(window_);
         if (m_dummy) m_dummy->draw(window_);
+
+        // 调试碰撞框 (始终在最上层)
+        if (m_debugReady) {
+            if (m_player) m_player->drawDebug(window_);
+            if (m_dummy) m_dummy->drawDebug(window_);
+        }
 
         // HUD 用默认视图 (不震动)
         window_.setView(window_.getDefaultView());

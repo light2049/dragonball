@@ -263,6 +263,7 @@ namespace db {
 
     // 主更新路径: CNS 驱动, 引擎级基本移动保持硬编码
     void Fighter::update(float dt, InputManager& inputMgr, const sf::Vector2f& opponentPos) {
+        m_frameStartState = m_currentStateNo; // 帧开始时的状态号
         if (isDead() && m_currentStateNo != 5150 && m_currentStateNo != 180 && m_currentStateNo != 5100) return;
         m_opponentPos = opponentPos;
         dt = std::min(dt, 0.05f);
@@ -327,6 +328,9 @@ namespace db {
             }
         }
 
+        // 1.5 重置每帧绘制覆盖 (由 AngleDraw / Trans 设置)
+        m_drawOverrides = DrawOverrides();
+
         // ==========================================
         // 2. CMD 指令评估
         // ==========================================
@@ -340,6 +344,7 @@ namespace db {
         // 3. 执行 StateDef -1 (CMD → 状态跳转)
         // ==========================================
         m_stateRegistry.executeState(-1, *this, &inputMgr, dt);
+        m_frameStartState = m_currentStateNo; // 在 -1 执行后重新捕获（此时已是目标状态）
 
         // ==========================================
         // 4. 引擎级基本移动逻辑 (状态 0/20/40/50/52)
@@ -507,12 +512,17 @@ namespace db {
             m_animationPlayer.clearLoopFlag();
         }
 
+        // 4.9 递减 AnimTime (CNS 执行前, 确保读到最新值)
+        m_animationPlayer.tickAnimTime();
+
         // 5. 执行当前状态的 CNS 控制器 (行走状态完全由引擎控制，跳过 CNS)
         if (m_currentStateNo != 20) {
             m_stateRegistry.executeState(m_currentStateNo, *this, &inputMgr, dt);
         }
         // 5a. 执行 State -2 (每帧控制器, 如 AssertSpecial, 自动切换等)
         m_stateRegistry.executeState(-2, *this, &inputMgr, dt);
+        // 5b. 执行 State -3 (角色自身每帧执行, 如 shadow aura, 落地音效等)
+        m_stateRegistry.executeState(-3, *this, &inputMgr, dt);
         // 5.1 保存 HitDefs 到缓存
         {
             const auto& hd = m_stateRegistry.getHitDefs(m_currentStateNo);
@@ -736,11 +746,14 @@ namespace db {
             e->animPlayer.draw(window, e->currentPos);
         }
 
-        // 4. 角色主体永远在最上面
-        m_animationPlayer.draw(window, m_position);
+        // 4. 角色主体永远在最上面 (应用 AngleDraw/Trans 覆盖)
+        m_animationPlayer.draw(window, m_position, &m_drawOverrides);
 
-        // ✅ 只有开启调试模式时，才绘制判定框
-        if (m_showDebug) {
+    }
+
+    void Fighter::drawDebug(sf::RenderWindow& window) const {
+        if (!m_showDebug) return;
+        {
             const AnimFrame& currentFrame = m_animationPlayer.getCurrentFrame();
 
             sf::Vector2f frameOffset{
