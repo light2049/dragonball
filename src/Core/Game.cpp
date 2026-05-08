@@ -384,6 +384,9 @@ namespace db {
             h.firstUpdate = false;  // 首次更新后清除标记
             h.drawOverrides = DrawOverrides(); // 重置每帧绘制覆盖
 
+            // 先移动再执行 CNS (确保碰撞检测在最新位置)
+            h.position.x += h.velocity.x * 60.f * dt;
+            h.position.y += h.velocity.y * 60.f * dt;
 
             // 6.1 执行 Helper 的 CNS 状态 (关键控制器)
             if (const auto* stateDef = h.stateRegistry ? h.stateRegistry->getStateDef(h.stateNo) : nullptr) {
@@ -464,12 +467,12 @@ namespace db {
                             break;
                         }
                         case ControllerType::HITDEF: {
-                            // Helper 的 HitDef 不检查触发条件 (避免 hitcount 等未知变量)
+                            // Helper 的 HitDef (碰撞检测基于最新位置)
                             if (!h.hasHit && m_player && m_dummy) {
                                 const auto& hitDefs = h.stateRegistry->getHitDefs(h.stateNo);
                                 if (!hitDefs.empty()) {
                                     for (const auto& hd : hitDefs) {
-                                        Fighter* target = h.facingRight ? m_dummy.get() : m_player.get();
+                                        Fighter* target = (h.parent == m_player.get()) ? m_dummy.get() : m_player.get();
                                         sf::FloatRect hurt = target->getActiveHurtbox();
                                         if (hurt.size.x > 0) {
                                             // 使用 Helper 当前动画帧的 clsn1 作为碰撞框
@@ -477,19 +480,50 @@ namespace db {
                                             const auto& frame = h.animPlayer.getCurrentFrame();
                                             if (!frame.clsn1.empty()) {
                                                 const auto& clsn = frame.clsn1[0];
-                                                sf::FloatRect r = clsn.toLocalRect();
                                                 float dir = h.facingRight ? 1.f : -1.f;
-                                                hb = {{h.position.x + r.position.x * dir, h.position.y + r.position.y}, {r.size.x, r.size.y}};
+                                                sf::Vector2f p1 = {h.position.x + clsn.topLeft.x * dir, h.position.y + clsn.topLeft.y};
+                                                sf::Vector2f p2 = {h.position.x + clsn.bottomRight.x * dir, h.position.y + clsn.bottomRight.y};
+                                                hb = {{std::min(p1.x, p2.x), std::min(p1.y, p2.y)}, {std::abs(p2.x - p1.x), std::abs(p2.y - p1.y)}};
                                             } else {
                                                 hb = {{h.position.x - 16.f, h.position.y - 16.f}, {32.f, 32.f}};
                                             }
                                             if (hb.findIntersection(hurt).has_value()) {
+                                                auto hitPos = hb.findIntersection(hurt);
                                                 target->takeDamage(hd.damage);
-                                                std::cout << "[HelperHit] state=" << h.stateNo
-                                                          << " dmg=" << hd.damage
-                                                          << " pos=" << h.position.x << "," << h.position.y << std::endl;
-                                                spawnSpark(hd.sparkno > 0 ? hd.sparkno : 1200, h.position);
-                                                h.done = true;
+
+                                                // 设置受击信息 (击退、停顿、状态)
+                                                HitInfo hitInfo;
+                                                hitInfo.damage = hd.damage;
+                                                hitInfo.guardDamage = hd.guardDamage;
+                                                hitInfo.groundVelocityX = hd.groundVelocityX;
+                                                hitInfo.airVelocityX = hd.airVelocityX;
+                                                hitInfo.airVelocityY = hd.airVelocityY;
+                                                hitInfo.animtype = hd.animtype;
+                                                hitInfo.groundHittime = hd.groundHittime > 0 ? hd.groundHittime : 15;
+                                                hitInfo.groundSlidetime = hd.groundSlidetime > 0 ? hd.groundSlidetime : 15;
+                                                hitInfo.fall = hd.fall;
+                                                target->setHitInfo(hitInfo);
+
+                                                // 受击方进入 hit 状态 (由 HitDef 的 animtype 决定)
+                                                int targetState = 5000;
+                                                std::string at = hd.animtype;
+                                                std::transform(at.begin(), at.end(), at.begin(), ::tolower);
+                                                if (at == "medium") targetState = 5001;
+                                                else if (at == "hard") targetState = 5002;
+                                                target->requestStateChange(targetState);
+
+                                                if (hitPos.has_value()) {
+                                                    spawnSpark(hd.sparkno > 0 ? hd.sparkno : 1200, {
+                                                        hitPos->position.x + hitPos->size.x / 2,
+                                                        hitPos->position.y + hitPos->size.y / 2
+                                                    });
+                                                } else {
+                                                    spawnSpark(hd.sparkno > 0 ? hd.sparkno : 1200, h.position);
+                                                }
+                                                if (hd.pausetime > 0) {
+                                                    m_hitStopTimer = hd.pausetime / 60.0f;
+                                                    target->setHitShakeOver(false);
+                                                }
                                                 h.hasHit = true;
                                                 break;
                                             }
@@ -533,12 +567,9 @@ namespace db {
                 }
             }
 
-            // 6.2 移动
-            h.position.x += h.velocity.x * 60.f * dt;
-            h.position.y += h.velocity.y * 60.f * dt;
-
             // 超出屏幕 → 移除 (lifetime 由 DestroySelf 控制, 不过期自动删除)
-            if (h.position.x < -200.f || h.position.x > 1000.f) {
+            h.lifetime--;
+            if (h.lifetime <= 0 || h.position.x < -200.f || h.position.x > 1000.f) {
                 h.done = true;
             }
         }
