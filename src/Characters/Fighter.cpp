@@ -341,8 +341,10 @@ namespace db {
             }
         }
 
-        // 1.5 重置每帧绘制覆盖 (由 AngleDraw / Trans 设置)
+        // 1.5 重置每帧绘制覆盖和 AssertSpecial 标志
         m_drawOverrides = DrawOverrides();
+        m_assertFlags = 0;
+        if (m_palFXTime > 0) m_palFXTime--;
 
         // 1.6 受击闪白计时
         if (m_hitFlashTimer > 0) {
@@ -796,8 +798,10 @@ namespace db {
             e->animPlayer.draw(window, e->currentPos);
         }
 
-        // 4. 角色主体永远在最上面 (应用 AngleDraw/Trans 覆盖)
-        m_animationPlayer.draw(window, m_position, &m_drawOverrides);
+        // 4. 角色主体 (应用 AngleDraw/Trans 覆盖, 检查 Invisible)
+        if (!(m_assertFlags & 1)) {
+            m_animationPlayer.draw(window, m_position, &m_drawOverrides);
+        }
 
     }
 

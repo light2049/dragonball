@@ -117,6 +117,9 @@ namespace db {
 
         tempSprite.setScale({ renderScaleX, m_scaleY * extraScaleY });
         tempSprite.setPosition({finalX, finalY});
+        if (overrides && overrides->rotation != 0.f) {
+            tempSprite.setRotation(sf::degrees(overrides->rotation));
+        }
 
         // 应用 Trans alpha 覆盖
         if (overrides) {

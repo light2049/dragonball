@@ -58,6 +58,8 @@ namespace db {
         if (t == "bindtoroot")      return ControllerType::BIND_TO_ROOT;
         if (t == "destroyself")      return ControllerType::DESTROY_SELF;
         if (t == "angledraw")        return ControllerType::ANGLEDRAW;
+        if (t == "angleadd")         return ControllerType::ANGLEADD;
+        if (t == "angleset")         return ControllerType::ANGLESET;
         if (t == "trans")            return ControllerType::TRANS;
 
         return ControllerType::NONE;
@@ -100,6 +102,11 @@ namespace db {
             case ControllerType::VARRANGESET:   return std::make_unique<VarRangeSetController>();
             case ControllerType::ASSERTSPECIAL: return std::make_unique<AssertSpecialController>();
             case ControllerType::ANGLEDRAW:     return std::make_unique<AngleDrawController>();
+            case ControllerType::ANGLEADD:      return std::make_unique<AngleAddController>();
+            case ControllerType::ANGLESET:      return std::make_unique<AngleSetController>();
+            case ControllerType::MAKEDUST:      return std::make_unique<MakeDustController>();
+            case ControllerType::PALFX:         return std::make_unique<PalFXController>();
+            case ControllerType::DEFENCEMULSET: return std::make_unique<DefenceMulSetController>();
             case ControllerType::TRANS:          return std::make_unique<TransController>();
             default:                            return nullptr;
         }
@@ -1185,9 +1192,12 @@ namespace db {
         type = ControllerType::VARSET;
     }
     void VarSetController::execute(Fighter& fighter, InputManager* inputMgr, float dt) const {
-        // 设置变量 (简化: 仅支持 sysvar)
-        if (paramStr.find("sysvar") != std::string::npos || value == 0) {
+        if (paramStr == "sysvar") {
             fighter.setSysVar(paramInt, value);
+        } else if (paramStr == "var") {
+            fighter.setVar(paramInt, value);
+        } else if (paramStr == "fvar") {
+            fighter.setFVar(paramInt, paramFloat);
         }
     }
 
@@ -1196,8 +1206,13 @@ namespace db {
         type = ControllerType::VARADD;
     }
     void VarAddController::execute(Fighter& fighter, InputManager* inputMgr, float dt) const {
-        int cur = fighter.getSysVar(paramInt);
-        fighter.setSysVar(paramInt, cur + value);
+        if (paramStr == "sysvar") {
+            fighter.setSysVar(paramInt, fighter.getSysVar(paramInt) + value);
+        } else if (paramStr == "var") {
+            fighter.setVar(paramInt, fighter.getVar(paramInt) + value);
+        } else if (paramStr == "fvar") {
+            fighter.setFVar(paramInt, fighter.getFVar(paramInt) + paramFloat);
+        }
     }
 
     // --- NotHitBy ---
@@ -1533,7 +1548,18 @@ namespace db {
         type = ControllerType::ASSERTSPECIAL;
     }
     void AssertSpecialController::parse(const std::string& key, const std::string& value) {
-        // 简化: 不处理特殊标志
+        std::string lowerKey = key;
+        std::transform(lowerKey.begin(), lowerKey.end(), lowerKey.begin(), ::tolower);
+        if (lowerKey == "flag") {
+            m_flags = 0;
+            std::stringstream ss(value);
+            std::string flag;
+            while (std::getline(ss, flag, ',')) {
+                flag = trimStr(flag);
+                std::transform(flag.begin(), flag.end(), flag.begin(), ::tolower);
+                if (flag == "invisible") m_flags |= 1;
+            }
+        }
     }
 
     // ==========================================
@@ -1591,12 +1617,76 @@ namespace db {
         int src = std::max(0, std::min(256, m_alphaSrc));
         overrides.alpha = static_cast<uint8_t>((src * 255) / 256);
     }
-    void AssertSpecialController::execute(Fighter& fighter, InputManager* inputMgr, float dt) const {}
+    void AssertSpecialController::execute(Fighter& fighter, InputManager* inputMgr, float dt) const { fighter.setAssertFlags(m_flags); }
     void DestroySelfController::execute(Fighter& fighter, InputManager* inputMgr, float dt) const {}
     void AngleDrawController::execute(Fighter& fighter, InputManager* inputMgr, float dt) const {
         auto& overrides = fighter.getDrawOverrides();
         overrides.scaleX = m_scaleX;
         overrides.scaleY = m_scaleY;
+    }
+
+    // ==========================================
+    // AngleAddController / AngleSetController
+    // ==========================================
+    AngleAddController::AngleAddController() { type = ControllerType::ANGLEADD; }
+    void AngleAddController::parse(const std::string& key, const std::string& value) {
+        if (key == "value") { try { m_angle = std::stof(value); } catch(...) {} }
+    }
+    void AngleAddController::execute(Fighter& fighter, InputManager* inputMgr, float dt) const {
+        fighter.getDrawOverrides().rotation += m_angle;
+    }
+    AngleSetController::AngleSetController() { type = ControllerType::ANGLESET; }
+    void AngleSetController::parse(const std::string& key, const std::string& value) {
+        if (key == "value") { try { m_angle = std::stof(value); } catch(...) {} }
+    }
+    void AngleSetController::execute(Fighter& fighter, InputManager* inputMgr, float dt) const {
+        fighter.getDrawOverrides().rotation = m_angle;
+    }
+
+    // ==========================================
+    // MakeDustController
+    // ==========================================
+    MakeDustController::MakeDustController() { type = ControllerType::MAKEDUST; }
+    void MakeDustController::execute(Fighter& fighter, InputManager* inputMgr, float dt) const {
+        // MakeDust 创建灰尘粒子效果
+        // 简化实现: 在地面且速度足够快时创建 Explod
+        if (fighter.isGrounded() && std::abs(fighter.getVelocityX()) > 60.f) {
+            // 使用现有的 Explod/Particle 系统
+            // 暂时跳过，需要 Game 级支持
+        }
+    }
+
+    // ==========================================
+    // PalFXController
+    // ==========================================
+    PalFXController::PalFXController() { type = ControllerType::PALFX; }
+    void PalFXController::parse(const std::string& key, const std::string& value) {
+        std::string lowerKey = key;
+        std::transform(lowerKey.begin(), lowerKey.end(), lowerKey.begin(), ::tolower);
+        if (lowerKey == "time") { try { m_time = std::stoi(value); } catch(...) {} }
+        else if (lowerKey == "add") {
+            // add = 128,128,128
+            // 简化: 只读第一个值
+            try { m_addR = std::stoi(value); } catch(...) {}
+        }
+        else if (lowerKey == "mul") {
+            // mul = 256,256,256
+            try { m_mulR = std::stoi(value); } catch(...) {}
+        }
+        else if (lowerKey == "sinadd") {
+            try { m_sinAddR = std::stoi(value); } catch(...) {}
+        }
+    }
+    void PalFXController::execute(Fighter& fighter, InputManager* inputMgr, float dt) const {
+        fighter.setPalFX(m_time, m_addR, m_addG, m_addB);
+    }
+
+    // ==========================================
+    // DefenceMulSetController
+    // ==========================================
+    DefenceMulSetController::DefenceMulSetController() { type = ControllerType::DEFENCEMULSET; }
+    void DefenceMulSetController::execute(Fighter& fighter, InputManager* inputMgr, float dt) const {
+        fighter.setDefenceMul(value);
     }
 
     // ==========================================

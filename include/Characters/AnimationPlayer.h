@@ -6,10 +6,11 @@
 
 namespace db {
 
-    // 单帧绘制覆盖 (由 AngleDraw / Trans 控制器每帧设置)
+    // 单帧绘制覆盖 (由 AngleDraw / Trans / AngleAdd / AngleSet 控制器每帧设置)
     struct DrawOverrides {
         float scaleX = 1.f;
         float scaleY = 1.f;
+        float rotation = 0.f;
         uint8_t alpha = 255;
         uint8_t hitFlash = 0;      // 受击闪白亮度 (0=无, 255=纯白)
         bool useAdditiveBlend = false;  // 由 trans=add / addalpha 设置

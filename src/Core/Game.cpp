@@ -472,7 +472,17 @@ namespace db {
                                         Fighter* target = h.facingRight ? m_dummy.get() : m_player.get();
                                         sf::FloatRect hurt = target->getActiveHurtbox();
                                         if (hurt.size.x > 0) {
-                                            sf::FloatRect hb({h.position.x - 16.f, h.position.y - 16.f}, {32.f, 32.f});
+                                            // 使用 Helper 当前动画帧的 clsn1 作为碰撞框
+                                            sf::FloatRect hb = {{0, 0}, {0, 0}};
+                                            const auto& frame = h.animPlayer.getCurrentFrame();
+                                            if (!frame.clsn1.empty()) {
+                                                const auto& clsn = frame.clsn1[0];
+                                                sf::FloatRect r = clsn.toLocalRect();
+                                                float dir = h.facingRight ? 1.f : -1.f;
+                                                hb = {{h.position.x + r.position.x * dir, h.position.y + r.position.y}, {r.size.x, r.size.y}};
+                                            } else {
+                                                hb = {{h.position.x - 16.f, h.position.y - 16.f}, {32.f, 32.f}};
+                                            }
                                             if (hb.findIntersection(hurt).has_value()) {
                                                 target->takeDamage(hd.damage);
                                                 std::cout << "[HelperHit] state=" << h.stateNo

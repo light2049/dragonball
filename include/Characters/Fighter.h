@@ -227,6 +227,20 @@ namespace db {
             if (idx >= 0 && idx < 60) return m_sysVar[idx];
             return 0;
         }
+        void setVar(int idx, int val) {
+            if (idx >= 0 && idx < 60) m_var[idx] = val;
+        }
+        int getVar(int idx) const {
+            if (idx >= 0 && idx < 60) return m_var[idx];
+            return 0;
+        }
+        void setFVar(int idx, float val) {
+            if (idx >= 0 && idx < 40) m_fvar[idx] = val;
+        }
+        float getFVar(int idx) const {
+            if (idx >= 0 && idx < 40) return m_fvar[idx];
+            return 0.f;
+        }
 
         // GetHitVar: 获取受击变量
         int getHitVar(const std::string& name) const;
@@ -241,6 +255,15 @@ namespace db {
         void setShake(int time, int ampl) { m_shakeTime = time; m_shakeAmpl = ampl; }
         int getShakeTime() const { return m_shakeTime; }
         int getShakeAmpl() const { return m_shakeAmpl; }
+        void setPalFX(int time, int addR, int addG, int addB) {
+            m_palFXTime = time; m_palFXAddR = addR; m_palFXAddG = addG; m_palFXAddB = addB;
+        }
+        int getPalFXTime() const { return m_palFXTime; }
+        int getPalFXAddR() const { return m_palFXAddR; }
+        int getPalFXAddG() const { return m_palFXAddG; }
+        int getPalFXAddB() const { return m_palFXAddB; }
+        void setDefenceMul(float mul) { m_defenceMul = mul; }
+        float getDefenceMul() const { return m_defenceMul; }
 
         // SuperPause
         void setSuperPause(int time, bool darken);
@@ -248,6 +271,8 @@ namespace db {
         // ✅ 绘制覆盖 (每帧)
         DrawOverrides& getDrawOverrides() { return m_drawOverrides; }
         const DrawOverrides& getDrawOverrides() const { return m_drawOverrides; }
+        void setAssertFlags(int flags) { m_assertFlags = flags; }
+        int getAssertFlags() const { return m_assertFlags; }
         bool isInSuperPause() const { return m_superPauseTime > 0; }
         int getSuperPauseTime() const { return m_superPauseTime; }
         bool getSuperPauseDarken() const { return m_superPauseDarken; }
@@ -332,10 +357,15 @@ namespace db {
 
         // ✅ 系统变量 (60 个整数, M.U.G.E.N 标准)
         int m_sysVar[60] = {0};
+        int m_var[60] = {0};
+        float m_fvar[40] = {0.f};
 
         // ✅ 画面震动 (EnvShake)
         int m_shakeTime = 0;
         int m_shakeAmpl = 0;
+        int m_palFXTime = 0;
+        int m_palFXAddR = 0, m_palFXAddG = 0, m_palFXAddB = 0;
+        float m_defenceMul = 1.f;
         int m_hitFlashTimer = 0;    // 受击闪白计时器 (帧数)
         int m_superPauseTime = 0;
         bool m_superPauseDarken = false;
@@ -349,6 +379,7 @@ namespace db {
 
         // ✅ 每帧绘制覆盖 (由 AngleDraw / Trans 控制器设置)
         DrawOverrides m_drawOverrides;
+        int m_assertFlags = 0;
 
         // ✅ Explod 特效实例列表
         std::vector<ExplodInstance> m_explods;

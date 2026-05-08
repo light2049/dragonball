@@ -157,6 +157,8 @@ namespace db {
         BIND_TO_ROOT,
         DESTROY_SELF,
         ANGLEDRAW,
+        ANGLEADD,
+        ANGLESET,
         TRANS,
     };
 
@@ -322,6 +324,7 @@ namespace db {
         AssertSpecialController();
         void parse(const std::string& key, const std::string& value) override;
         void execute(Fighter& fighter, InputManager* inputMgr, float dt) const override;
+        int m_flags = 0; // 位掩码: 1=invisible
     };
 
     class AngleDrawController : public CNSController {
@@ -441,6 +444,50 @@ namespace db {
         void parse(const std::string& key, const std::string& value) override;
         void execute(Fighter& fighter, InputManager* inputMgr, float dt) const override {}
         int m_posX = 0, m_posY = 0;
+    };
+
+    // --- AngleAdd (逐帧累加旋转角度) ---
+    class AngleAddController : public CNSController {
+    public:
+        AngleAddController();
+        void parse(const std::string& key, const std::string& value) override;
+        void execute(Fighter& fighter, InputManager* inputMgr, float dt) const override;
+        float m_angle = 0.f;
+    };
+
+    // --- AngleSet (设置旋转角度) ---
+    class AngleSetController : public CNSController {
+    public:
+        AngleSetController();
+        void parse(const std::string& key, const std::string& value) override;
+        void execute(Fighter& fighter, InputManager* inputMgr, float dt) const override;
+        float m_angle = 0.f;
+    };
+
+    // --- MakeDust (跑步灰尘) ---
+    class MakeDustController : public CNSController {
+    public:
+        MakeDustController();
+        void execute(Fighter& fighter, InputManager* inputMgr, float dt) const override;
+    };
+
+    // --- PalFX (调色板特效) ---
+    class PalFXController : public CNSController {
+    public:
+        PalFXController();
+        void parse(const std::string& key, const std::string& value) override;
+        void execute(Fighter& fighter, InputManager* inputMgr, float dt) const override;
+        int m_time = 0;
+        int m_addR = 0, m_addG = 0, m_addB = 0;
+        int m_mulR = 256, m_mulG = 256, m_mulB = 256;
+        int m_sinAddR = 0, m_sinAddG = 0, m_sinAddB = 0;
+    };
+
+    // --- DefenceMulSet (防御倍率) ---
+    class DefenceMulSetController : public CNSController {
+    public:
+        DefenceMulSetController();
+        void execute(Fighter& fighter, InputManager* inputMgr, float dt) const override;
     };
 
     // --- HitVelSet (受击击退速度) ---

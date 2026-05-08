@@ -491,6 +491,28 @@ namespace db {
                         } catch (...) {}
                     }
                 }
+                else if (lowerKey.starts_with("fvar(")) {
+                    size_t parenL = lowerKey.find('(');
+                    size_t parenR = lowerKey.find(')');
+                    if (parenL != std::string::npos && parenR > parenL) {
+                        try {
+                            currentController->paramInt = std::stoi(lowerKey.substr(parenL + 1, parenR - parenL - 1));
+                            currentController->paramFloat = std::stof(value);
+                            currentController->paramStr = "fvar";
+                        } catch (...) {}
+                    }
+                }
+                else if (lowerKey.starts_with("var(")) {
+                    size_t parenL = lowerKey.find('(');
+                    size_t parenR = lowerKey.find(')');
+                    if (parenL != std::string::npos && parenR > parenL) {
+                        try {
+                            currentController->paramInt = std::stoi(lowerKey.substr(parenL + 1, parenR - parenL - 1));
+                            currentController->value = std::stoi(value);
+                            currentController->paramStr = "var";
+                        } catch (...) {}
+                    }
+                }
                 else if (lowerKey == "persistent") {
                     try { currentController->persistent = std::stoi(value); } catch (...) {}
                 }
