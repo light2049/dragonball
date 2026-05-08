@@ -362,7 +362,14 @@ namespace db {
                     try { hit.groundSlidetime = std::stoi(value); } catch (...) {}
                 }
                 else if (lowerKey == "ground.velocity") {
-                    try { hit.groundVelocityX = std::stof(value); } catch (...) {}
+                    size_t commaPos = value.find(',');
+                    if (commaPos != std::string::npos) {
+                        auto p = parsePair<float>(value);
+                        hit.groundVelocityX = p.first;
+                        hit.groundVelocityY = p.second;
+                    } else {
+                        try { hit.groundVelocityX = std::stof(value); } catch(...) {}
+                    }
                 }
                 else if (lowerKey == "air.velocity") {
                     auto p = parsePair<float>(value);

@@ -47,6 +47,7 @@ namespace db {
             {
                 float offsetY = static_cast<float>(m_player->getAnimationPlayer().getCurrentFrame().offset.y);
                 m_player->setPosition(200.0f, 480.0f - offsetY);
+                m_player->setGroundLevel(480.0f - offsetY);
                 logMsg("Player loaded\n");
             }
 
@@ -60,6 +61,7 @@ namespace db {
             {
                 float offsetY = static_cast<float>(m_dummy->getAnimationPlayer().getCurrentFrame().offset.y);
                 m_dummy->setPosition(600.0f, 480.0f - offsetY);
+                m_dummy->setGroundLevel(480.0f - offsetY);
                 logMsg("Dummy loaded\n");
             }
 
@@ -172,12 +174,9 @@ namespace db {
             m_roundTimer -= dt;
         }
 
-        // HitStop 冻结恢复后设置 HitShakeOver
+        // HitStop 冻结 (HitShakeOver 由 Fighter::update 基于状态计时器管理)
         if (m_hitStopTimer > 0.0f) {
             m_hitStopTimer -= dt;
-            if (m_hitStopTimer <= 0.0f && m_dummy) {
-                m_dummy->setHitShakeOver(true);
-            }
             return;
         }
 
@@ -236,48 +235,7 @@ namespace db {
             sf::Vector2f dummyPos = m_dummy ? m_dummy->getPosition() : sf::Vector2f(-9999.f, 0.f);
             int oldState = m_player->getCurrentStateNo();
             m_player->update(dt, inputManager_, dummyPos);
-            // P1 更新后立即做命中检测(此时 HitDefs 可能刚注册)
-            if (m_dummy && !m_player->hasMoveContact()) {
-                const auto& hitDefs = m_player->getCurrentHitDefs();
-                if (!hitDefs.empty()) {
-                    sf::FloatRect hitBox = m_player->getActiveHitbox();
-                    sf::FloatRect hurtBox = m_dummy->getActiveHurtbox();
-                    static int hitDiag = 0;
-                    if (++hitDiag % 30 == 1) {
-                        std::cout << "[inlineCheck] state=" << m_player->getCurrentStateNo()
-                                  << " hitBox=" << hitBox.position.x << "," << hitBox.position.y << " " << hitBox.size.x << "x" << hitBox.size.y
-                                  << " hurtBox=" << hurtBox.position.x << "," << hurtBox.position.y << " " << hurtBox.size.x << "x" << hurtBox.size.y
-                                  << " pos=" << m_player->getPosition().x << "," << m_player->getPosition().y
-                                  << " dpos=" << m_dummy->getPosition().x << "," << m_dummy->getPosition().y
-                                  << std::endl;
-                    }
-                    if (hitBox.size.x > 0 && hitBox.size.y > 0 &&
-                        hurtBox.size.x > 0 && hurtBox.size.y > 0 &&
-                        hitBox.findIntersection(hurtBox).has_value()) {
-                        std::cout << "[inlineCheckCombat] HIT! state=" << m_player->getCurrentStateNo() << std::endl;
-                        m_player->setMoveContact(true);
-                        const auto& hit = hitDefs[0];
-                        HitInfo info;
-                        info.damage = hit.damage;
-                        info.guardDamage = hit.guardDamage;
-                        info.p1stateno = hit.p1stateno;
-                        info.p2stateno = hit.p2stateno;
-                        info.groundVelocityX = hit.groundVelocityX;
-                        m_dummy->setHitInfo(info);
-                        m_dummy->takeDamage(info.damage);
-                        float knockback = info.groundVelocityX * 60.f;
-                        m_dummy->setVelocityX(m_player->isFacingRight() ? knockback : -knockback);
-                        int targetState = info.p2stateno > 0 ? info.p2stateno : 5000;
-                        m_dummy->requestStateChange(targetState);
-                        if (info.p1stateno > 0) m_player->requestStateChange(info.p1stateno);
-                        if (hit.pausetime > 0) {
-                            m_hitStopTimer = hit.pausetime / 60.0f;
-                            m_dummy->setHitShakeOver(false);
-                        }
-                        spawnSpark(hit.sparkno, {hitBox.position.x + hitBox.size.x/2.f, hitBox.position.y + hitBox.size.y/2.f});
-                    }
-                }
-            }
+            // 命中检测由 checkCombat() 统一处理 (在 P2 更新之后)
             int newState = m_player->getCurrentStateNo();
         }
 
@@ -705,6 +663,8 @@ namespace db {
             if (info.p1stateno > 0) {
                 m_player->requestStateChange(info.p1stateno);
             }
+
+            m_dummy->setHitShakeOver(false);
 
             if (hit.pausetime > 0) {
                 m_hitStopDuration = hit.pausetime;

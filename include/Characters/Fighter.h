@@ -18,7 +18,8 @@ namespace db {
         int groundHittime = 15;      // 受击硬直 (ticks)
         int groundSlidetime = 15;    // 滑行时间 (ticks)
         int airHittime = 12;         // 空中硬直时间
-        float groundVelocityX = -3.f; // 地面击退 (px/tick)
+        float groundVelocityX = -3.f; // 地面击退 X
+        float groundVelocityY = 0.f;  // 地面击退 Y
         float airVelocityX = -1.4f;   // 空中击退 X
         float airVelocityY = -3.f;    // 空中击退 Y
         float airguardVelocityX = -1.9f; // 空中防御击退
@@ -197,6 +198,10 @@ namespace db {
         // 防御距离检测
         bool isInGuardDist() const;
 
+        // 地面碰撞高度设置 (由 Game 构造函数初始化)
+        void setGroundLevel(float y) { m_groundLevel = y; }
+        float getGroundLevel() const { return m_groundLevel; }
+
         // 状态类型 (return 0=S, 1=C, 2=A)
         int getStateType() const { return m_stateType; }
 
@@ -317,6 +322,7 @@ namespace db {
         bool m_isHitOver = true;  // 受击状态是否结束
         bool m_isHitShakeOver = true; // 受击震动是否结束
         bool m_canRecover = false; // 是否可以受身恢复
+        float m_groundLevel = 478.0f; // 地面轴高度 (由 Game 初始化)
 
         int m_currentPower = 0;
         int m_maxPower = 3000;
@@ -330,6 +336,7 @@ namespace db {
         // ✅ 画面震动 (EnvShake)
         int m_shakeTime = 0;
         int m_shakeAmpl = 0;
+        int m_hitFlashTimer = 0;    // 受击闪白计时器 (帧数)
         int m_superPauseTime = 0;
         bool m_superPauseDarken = false;
         int m_roundState = 0;

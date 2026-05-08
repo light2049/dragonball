@@ -91,6 +91,11 @@ namespace db {
             case ControllerType::AFTERIMAGE:    return std::make_unique<AfterImageController>();
             case ControllerType::SUPERPAUSE:    return std::make_unique<SuperPauseController>();
             case ControllerType::BIND_TO_ROOT:  return std::make_unique<BindToRootController>();
+            case ControllerType::HITVELSET:     return std::make_unique<HitVelSetController>();
+            case ControllerType::POSFREEZE:     return std::make_unique<PosFreezeController>();
+            case ControllerType::HITFALLDAMAGE: return std::make_unique<HitFallDamageController>();
+            case ControllerType::HITFALLVEL:    return std::make_unique<HitFallVelController>();
+            case ControllerType::HITFALLSET:    return std::make_unique<HitFallSetController>();
             case ControllerType::DESTROY_SELF:  return std::make_unique<DestroySelfController>();
             case ControllerType::VARRANGESET:   return std::make_unique<VarRangeSetController>();
             case ControllerType::ASSERTSPECIAL: return std::make_unique<AssertSpecialController>();
@@ -171,14 +176,18 @@ namespace db {
 
             case CondType::TIME: {
                 int time = fighter.getStateTime();
+                int val = rhsInt;
+                if (isRange && !rangeExpr.empty()) {
+                    val = fighter.getHitVar(rangeExpr);
+                }
                 switch (op) {
-                    case CondOp::EQ:  result = (time == rhsInt); break;
-                    case CondOp::NEQ: result = (time != rhsInt); break;
-                    case CondOp::GT:  result = (time > rhsInt); break;
-                    case CondOp::GTE: result = (time >= rhsInt); break;
-                    case CondOp::LT:  result = (time < rhsInt); break;
-                    case CondOp::LTE: result = (time <= rhsInt); break;
-                    default: result = (time == rhsInt);
+                    case CondOp::EQ:  result = (time == val); break;
+                    case CondOp::NEQ: result = (time != val); break;
+                    case CondOp::GT:  result = (time > val); break;
+                    case CondOp::GTE: result = (time >= val); break;
+                    case CondOp::LT:  result = (time < val); break;
+                    case CondOp::LTE: result = (time <= val); break;
+                    default: result = (time == val);
                 }
                 break;
             }
@@ -402,6 +411,11 @@ namespace db {
                 break;
             }
 
+            case CondType::HITFALL: {
+                result = fighter.getHitVar("fall") != 0;
+                break;
+            }
+
             case CondType::MOVETYPE: {
                 result = (fighter.getMoveType() == rhsInt);
                 break;
@@ -585,9 +599,16 @@ namespace db {
                 if (commaPos != std::string::npos) {
                     try { cond.rangeLow = std::stoi(rangeContent.substr(0, commaPos)); } catch(...) {}
                     try { cond.rangeHigh = std::stoi(rangeContent.substr(commaPos + 1)); } catch(...) {}
+                } else if (!isSimpleNumber(rangeContent)) {
+                    // [ground.SlideTime] 等表达式: 运行时求值
+                    cond.rangeExpr = rangeContent;
                 }
-                // 区间条件下，所有 stoi/stof 都用 rangeLow 替代，防止异常
-                rhs = std::to_string(cond.rangeLow);
+                if (!cond.rangeExpr.empty()) {
+                    rhs = "0"; // 占位, 运行时由 evaluate 处理
+                } else {
+                    // 区间条件下，所有 stoi/stof 都用 rangeLow 替代，防止异常
+                    rhs = std::to_string(cond.rangeLow);
+                }
             }
 
             // 匹配左侧的变量名
@@ -1531,6 +1552,61 @@ namespace db {
         auto& overrides = fighter.getDrawOverrides();
         overrides.scaleX = m_scaleX;
         overrides.scaleY = m_scaleY;
+    }
+
+    // ==========================================
+    // HitVelSetController
+    // ==========================================
+    HitVelSetController::HitVelSetController() { type = ControllerType::HITVELSET; }
+    void HitVelSetController::execute(Fighter& fighter, InputManager* inputMgr, float dt) const {
+        const auto& info = fighter.getHitInfo();
+        if (hasX && info.groundVelocityX != 0.f) {
+            float vx = info.groundVelocityX * valueX * 60.f;
+            fighter.setVelocityX(vx);
+        }
+        if (hasY) {
+            float vy = (info.groundVelocityY != 0.f ? info.groundVelocityY : info.airVelocityY) * valueY * 60.f;
+            fighter.setVelocityY(vy);
+        }
+    }
+
+    // ==========================================
+    // PosFreezeController
+    // ==========================================
+    PosFreezeController::PosFreezeController() { type = ControllerType::POSFREEZE; }
+    void PosFreezeController::execute(Fighter& fighter, InputManager* inputMgr, float dt) const {
+        fighter.setVelocityX(0.f);
+        fighter.setVelocityY(0.f);
+    }
+
+    // ==========================================
+    // HitFallDamageController
+    // ==========================================
+    HitFallDamageController::HitFallDamageController() { type = ControllerType::HITFALLDAMAGE; }
+    void HitFallDamageController::execute(Fighter& fighter, InputManager* inputMgr, float dt) const {
+        int fallYVel = fighter.getHitVar("fall.yvel");
+        int damage = std::abs(fallYVel);
+        if (damage > 0) {
+            fighter.takeDamage(damage);
+        }
+    }
+
+    // ==========================================
+    // HitFallVelController
+    // ==========================================
+    HitFallVelController::HitFallVelController() { type = ControllerType::HITFALLVEL; }
+    void HitFallVelController::execute(Fighter& fighter, InputManager* inputMgr, float dt) const {
+        float vy = fighter.getHitInfo().fallyvel * 60.f;
+        fighter.setVelocityY(vy);
+    }
+
+    // ==========================================
+    // HitFallSetController
+    // ==========================================
+    HitFallSetController::HitFallSetController() { type = ControllerType::HITFALLSET; }
+    void HitFallSetController::execute(Fighter& fighter, InputManager* inputMgr, float dt) const {
+        // HitFallSet 的 value 来自 CNS 的 value = 1
+        // 目前在 HitInfo 中由 HitDef 的 fall 参数控制
     }
 
 } // namespace db

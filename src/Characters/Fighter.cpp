@@ -73,6 +73,7 @@ namespace db {
         if (isDead()) return;
         m_currentLife -= damage;
         if (m_currentLife < 0) m_currentLife = 0;
+        m_hitFlashTimer = 6;  // 闪白持续 6 帧
         // 移除被击中时应清除的特效
         m_explods.erase(std::remove_if(m_explods.begin(), m_explods.end(),
             [](const ExplodInstance& e) { return e.removeOnGetHit; }), m_explods.end());
@@ -106,6 +107,7 @@ namespace db {
         if (path == "movement.airjump.num")      return static_cast<float>(m_moveData.airjumpNum);
         if (path == "movement.airjump.height")   return static_cast<float>(m_moveData.airjumpHeight);
         if (path == "movement.stand.friction.threshold")  return 0.5f;  // M.U.G.E.N 默认阈值
+        if (path == "movement.air.gethit.groundlevel")   return m_groundLevel;  // 地面阈值
         if (path == "movement.crouch.friction.threshold") return 0.5f;
         return 0.0f;
     }
@@ -299,17 +301,28 @@ namespace db {
         m_velocity.y += gravity * dt;
         m_position += m_velocity * dt;
 
-        if (applyGroundCollision && getFeetY() >= GROUND_Y) {
+        // 地面碰撞: 触地时复位 (所有类型)
+        if (getFeetY() >= GROUND_Y) {
             m_position.y = GROUND_Y - static_cast<float>(m_animationPlayer.getCurrentFrame().offset.y);
-            m_velocity.y = 0;
+            // 空中类型不归零 Y 速度 (CNS 用 Vel Y > 0 检测落地)
+            if (m_stateType != 2) {
+                m_velocity.y = 0;
+            }
             if (!m_isGrounded && m_physicsType == 2) {
                 requestStateChange(52);
             }
             m_isGrounded = true;
         } else if (applyGroundCollision) {
             m_isGrounded = false;
+        } else {
+            m_isGrounded = false;
         }
 
+        // physics = N 时接地后施加阻力防止无限滑行
+        if (!applyGroundCollision && friction == 1.f && m_isGrounded) {
+            m_velocity.x *= 0.88f;
+            if (std::abs(m_velocity.x) < 5.f) m_velocity.x = 0;
+        }
         if (m_isGrounded && friction < 1.f) {
             m_velocity.x *= std::pow(friction, dt * 60.f);
             if (std::abs(m_velocity.x) < 5.f) m_velocity.x = 0;
@@ -330,6 +343,12 @@ namespace db {
 
         // 1.5 重置每帧绘制覆盖 (由 AngleDraw / Trans 设置)
         m_drawOverrides = DrawOverrides();
+
+        // 1.6 受击闪白计时
+        if (m_hitFlashTimer > 0) {
+            m_drawOverrides.hitFlash = static_cast<uint8_t>((m_hitFlashTimer * 255) / 6);
+            m_hitFlashTimer--;
+        }
 
         // ==========================================
         // 2. CMD 指令评估
@@ -506,8 +525,17 @@ namespace db {
         }
 
         // ==========================================
-        // 4.5 KO 倒地动画播完 → 败退姿势 (170)
-        if ((m_currentStateNo == 5100 || m_currentStateNo == 5150) && m_animationPlayer.hasJustLooped()) {
+        // 4.5 引擎级倒地/起身/败退
+        // 5110(躺地) → 5120(起身): M.U.G.E.N 引擎内置行为
+        if (m_currentStateNo == 5110) {
+            int lieTicks = static_cast<int>(m_stateTimer * 60.f);
+            int getupTime = std::max(m_hitInfo.groundHittime, m_hitInfo.groundSlidetime) + 20;
+            if (lieTicks >= getupTime) {
+                requestStateChange(5120);
+            }
+        }
+        // 5150(死亡躺地) → 170(败退姿势)
+        if (m_currentStateNo == 5150 && m_animationPlayer.hasJustLooped()) {
             if (m_stateRegistry.hasState(170)) requestStateChange(170);
             m_animationPlayer.clearLoopFlag();
         }
@@ -536,6 +564,10 @@ namespace db {
             int stateTicks = static_cast<int>(m_stateTimer * 60.f);
             if (stateTicks >= m_hitInfo.groundHittime) {
                 m_isHitOver = true;
+            }
+            // 受击震动持续 groundHittime 帧后结束 (让受击动画有显示时间)
+            if (!m_isHitShakeOver && stateTicks >= m_hitInfo.groundHittime) {
+                m_isHitShakeOver = true;
             }
         }
 
@@ -573,6 +605,11 @@ namespace db {
         // 9. 动画更新
         // ==========================================
         m_animationPlayer.update(dt);
+
+        // 9.5 安全地面碰撞 (在 CNS PosSet 等可能修改位置后再次执行)
+        if (getFeetY() >= GROUND_Y) {
+            m_position.y = GROUND_Y - static_cast<float>(m_animationPlayer.getCurrentFrame().offset.y);
+        }
 
         // ==========================================
         // 10. Explod 每帧更新
@@ -683,17 +720,28 @@ namespace db {
         m_velocity.y += gravity * dt;
         m_position += m_velocity * dt;
 
-        if (applyGroundCollision && getFeetY() >= GROUND_Y) {
+        // 地面碰撞: 触地时复位 (所有类型)
+        if (getFeetY() >= GROUND_Y) {
             m_position.y = GROUND_Y - static_cast<float>(m_animationPlayer.getCurrentFrame().offset.y);
-            m_velocity.y = 0;
+            // 空中类型不归零 Y 速度 (CNS 用 Vel Y > 0 检测落地)
+            if (m_stateType != 2) {
+                m_velocity.y = 0;
+            }
             if (!m_isGrounded && m_physicsType == 2) {
                 requestStateChange(52);
             }
             m_isGrounded = true;
         } else if (applyGroundCollision) {
             m_isGrounded = false;
+        } else {
+            m_isGrounded = false;
         }
 
+        // physics = N 时接地后施加阻力防止无限滑行
+        if (!applyGroundCollision && friction == 1.f && m_isGrounded) {
+            m_velocity.x *= 0.88f;
+            if (std::abs(m_velocity.x) < 5.f) m_velocity.x = 0;
+        }
         if (m_isGrounded && friction < 1.f) {
             m_velocity.x *= std::pow(friction, dt * 60.f);
             if (std::abs(m_velocity.x) < 5.f) m_velocity.x = 0;
@@ -845,7 +893,7 @@ namespace db {
         if (n == "fall")            return m_hitInfo.fall ? 1 : 0;
         if (n == "fall.recover")    return m_hitInfo.fallrecover ? 1 : 0;
         if (n == "fall.yvel")       return static_cast<int>(m_hitInfo.fallyvel);
-        if (n == "yaccel")          return m_hitInfo.yaccel > 0 ? m_hitInfo.yaccel : static_cast<int>(m_moveData.yaccel * 3600.f);
+        if (n == "yaccel")          return m_hitInfo.yaccel > 0 ? m_hitInfo.yaccel : static_cast<int>(m_moveData.yaccel * 60.f);
         if (n == "ctrltime")        return m_hitInfo.ctrltime > 0 ? m_hitInfo.ctrltime : m_hitInfo.groundHittime + 1;
         if (n == "animtype") {
             std::string t = m_hitInfo.animtype;

@@ -48,6 +48,7 @@ namespace db {
         int groundHittime = 0;       // 地面受击硬直
         int groundSlidetime = 0;     // 地面滑行时间
         float groundVelocityX = 0.f; // 地面击退 X
+        float groundVelocityY = 0.f; // 地面击退 Y
         float airHittime = 0;        // 空中受击硬直
         float airVelocityX = 0.f;    // 空中击退 X
         float airVelocityY = 0.f;    // 空中击退 Y

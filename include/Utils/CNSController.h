@@ -81,6 +81,9 @@ namespace db {
         int rangeLow = 0;
         int rangeHigh = 0;
 
+        // 范围表达式 (如 [ground.SlideTime])
+        std::string rangeExpr;
+
         // 参数 (如 GetHitVar 的参数名, const 的路径)
         std::string paramStr;
         int paramInt = 0;
@@ -434,6 +437,41 @@ namespace db {
         void parse(const std::string& key, const std::string& value) override;
         void execute(Fighter& fighter, InputManager* inputMgr, float dt) const override {}
         int m_posX = 0, m_posY = 0;
+    };
+
+    // --- HitVelSet (受击击退速度) ---
+    class HitVelSetController : public CNSController {
+    public:
+        HitVelSetController();
+        void execute(Fighter& fighter, InputManager* inputMgr, float dt) const override;
+    };
+
+    // --- PosFreeze (锁定位置) ---
+    class PosFreezeController : public CNSController {
+    public:
+        PosFreezeController();
+        void execute(Fighter& fighter, InputManager* inputMgr, float dt) const override;
+    };
+
+    // --- HitFallDamage (落地伤害) ---
+    class HitFallDamageController : public CNSController {
+    public:
+        HitFallDamageController();
+        void execute(Fighter& fighter, InputManager* inputMgr, float dt) const override;
+    };
+
+    // --- HitFallVel (弹地速度) ---
+    class HitFallVelController : public CNSController {
+    public:
+        HitFallVelController();
+        void execute(Fighter& fighter, InputManager* inputMgr, float dt) const override;
+    };
+
+    // --- HitFallSet (结束倒地状态) ---
+    class HitFallSetController : public CNSController {
+    public:
+        HitFallSetController();
+        void execute(Fighter& fighter, InputManager* inputMgr, float dt) const override;
     };
 
     // CNS 表达式求值 (p2dist, const(), etc.)

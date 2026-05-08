@@ -122,6 +122,13 @@ namespace db {
         if (overrides) {
             sf::Color c = tempSprite.getColor();
             c.a = overrides->alpha;
+            // 受击闪白: 将颜色向白色混合
+            if (overrides->hitFlash > 0) {
+                uint8_t flash = overrides->hitFlash;
+                c.r = static_cast<uint8_t>(c.r + (255 - c.r) * flash / 255);
+                c.g = static_cast<uint8_t>(c.g + (255 - c.g) * flash / 255);
+                c.b = static_cast<uint8_t>(c.b + (255 - c.b) * flash / 255);
+            }
             tempSprite.setColor(c);
         }
 
