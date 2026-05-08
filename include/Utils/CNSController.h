@@ -86,6 +86,9 @@ namespace db {
         // 范围表达式 (如 [ground.SlideTime])
         std::string rangeExpr;
 
+        // RHS 表达式 (当 rhsFloat 解析失败时，如 ifelse(...), Const(...))
+        std::string rhsExpr;
+
         // 参数 (如 GetHitVar 的参数名, const 的路径)
         std::string paramStr;
         int paramInt = 0;

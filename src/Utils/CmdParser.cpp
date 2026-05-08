@@ -359,9 +359,18 @@ namespace db {
     }
 
     void CmdParser::evaluate(const InputManager& input) {
+        // 递减所有缓冲计数
+        for (auto& [name, frames] : m_buffer) {
+            if (frames > 0) frames--;
+        }
+
         m_active.clear();
         for (const auto& [name, def] : m_commands) {
-            m_active[name] = evaluateCommand(def, input);
+            bool triggered = evaluateCommand(def, input);
+            if (triggered) {
+                m_buffer[name] = def.time;  // 触发后缓冲 time 帧
+            }
+            m_active[name] = (m_buffer[name] > 0);
         }
     }
 

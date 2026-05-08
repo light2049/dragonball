@@ -50,6 +50,7 @@ namespace db {
 
         std::map<std::string, CommandDef> m_commands;
         std::map<std::string, bool> m_active; // 每帧计算结果缓存
+        std::map<std::string, int> m_buffer;  // 命令缓冲帧计数
     };
 
 } // namespace db

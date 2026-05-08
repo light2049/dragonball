@@ -468,7 +468,7 @@ namespace db {
                         }
                         case ControllerType::HITDEF: {
                             // Helper 的 HitDef (碰撞检测基于最新位置)
-                            if (!h.hasHit && m_player && m_dummy) {
+                            if (h.hitCooldown <= 0 && m_player && m_dummy) {
                                 const auto& hitDefs = h.stateRegistry->getHitDefs(h.stateNo);
                                 if (!hitDefs.empty()) {
                                     for (const auto& hd : hitDefs) {
@@ -491,12 +491,7 @@ namespace db {
                                                 auto hitPos = hb.findIntersection(hurt);
                                                 target->takeDamage(hd.damage);
 
-                                                // 直接应用击退速度, 不依赖受击状态链的 HitVelSet
-                                                float dir = h.facingRight ? 1.f : -1.f;
-                                                target->setVelocityX(hd.groundVelocityX * 60.f * dir);
-                                                target->setVelocityY(hd.airVelocityY * 60.f);
-
-                                                // 设置 HitInfo 供 CNS 条件使用
+                                                // 设置 HitInfo (保留原始速度, 击飞在气功波结束后才触发)
                                                 HitInfo hitInfo;
                                                 hitInfo.damage = hd.damage;
                                                 hitInfo.groundVelocityX = hd.groundVelocityX;
@@ -507,7 +502,10 @@ namespace db {
                                                 hitInfo.fall = hd.fall;
                                                 target->setHitInfo(hitInfo);
 
-                                                // 进入受击状态
+                                                // 每次命中重新进入受击状态 5000
+                                                // → velset=0,0 冻结目标 + stateTimer 重置
+                                                // → 目标原地硬直, 不击飞
+                                                // → 气功波结束后不再重置, 计时器走到 HitShakeOver 才击飞
                                                 std::string at = hd.animtype;
                                                 std::transform(at.begin(), at.end(), at.begin(), ::tolower);
                                                 int ts = 5000;
@@ -523,11 +521,14 @@ namespace db {
                                                 } else {
                                                     spawnSpark(hd.sparkno > 0 ? hd.sparkno : 1200, h.position);
                                                 }
-                                                if (hd.pausetime > 0) {
-                                                    m_hitStopTimer = hd.pausetime / 60.0f;
+                                                // 应用防御方暂停帧 (pausetime 第二值)
+                                                int defenderPause = hd.guardPausetime;
+                                                if (defenderPause > 0) {
+                                                    m_hitStopTimer = defenderPause / 60.0f;
                                                     target->setHitShakeOver(false);
                                                 }
                                                 h.hasHit = true;
+                                                h.hitCooldown = 2;
                                                 break;
                                             }
                                         }
@@ -572,6 +573,8 @@ namespace db {
 
             // 超出屏幕 → 移除 (lifetime 由 DestroySelf 控制, 不过期自动删除)
             h.lifetime--;
+            if (h.hitCooldown > 0) h.hitCooldown--;
+            else h.hasHit = false;
             if (h.lifetime <= 0 || h.position.x < -200.f || h.position.x > 1000.f) {
                 h.done = true;
             }
@@ -707,6 +710,8 @@ namespace db {
 
             // P1STATENO: 攻击方命中后强制跳转状态 (连段链)
             if (info.p1stateno > 0) {
+                std::cout << "[Combo] p1stateno=" << info.p1stateno
+                          << " playerState=" << m_player->getCurrentStateNo() << std::endl;
                 m_player->requestStateChange(info.p1stateno);
             }
 

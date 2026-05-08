@@ -27,6 +27,7 @@ namespace db {
         int damage = 20;
         int sparkno = 1200;
         bool hasHit = false;
+        int hitCooldown = 0;
         int sprpriority = 0;   // 绘制层级
         // CNS 执行
         int stateNo = 0;

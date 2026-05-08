@@ -104,6 +104,7 @@ namespace db {
         int ctrl = -1;               // 新增：控制权 (-1=不变, 0=无控, 1=有控)
         float velsetX = 0.f;         // 新增：状态初始速度 VelSet
         float velsetY = 0.f;
+        bool hasVelset = false;       // 是否显式指定了 velset
         int poweradd = 0;            // 新增：进入状态增加的 Power
         int anim = -1;               // 状态默认动画 (-1=不切换)
         int sprpriority = 0;          // 绘制层级

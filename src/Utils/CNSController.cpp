@@ -341,10 +341,12 @@ namespace db {
 
             case CondType::VEL_X: {
                 float vx = fighter.getVelocityX();
-                // M.U.G.E.N: vel x 是相对于角色朝向
                 if (!fighter.isFacingRight()) { vx = -vx; }
                 // CNS 速度单位为 px/tick, 引擎为 px/s, 转换 RHS
                 float compareVal = rhsFloat * 60.f;
+                if (!rhsExpr.empty()) {
+                    compareVal = static_cast<float>(evaluateCNSExpression(rhsExpr, fighter)) * 60.f;
+                }
                 switch (op) {
                     case CondOp::GT:  result = (vx > compareVal); break;
                     case CondOp::GTE: result = (vx >= compareVal); break;
@@ -361,6 +363,9 @@ namespace db {
                 float vy = fighter.getVelocityY();
                 // CNS 速度单位为 px/tick, 引擎为 px/s, 转换 RHS
                 float compareVal = rhsFloat * 60.f;
+                if (!rhsExpr.empty()) {
+                    compareVal = static_cast<float>(evaluateCNSExpression(rhsExpr, fighter)) * 60.f;
+                }
                 switch (op) {
                     case CondOp::GT:  result = (vy > compareVal); break;
                     case CondOp::GTE: result = (vy >= compareVal); break;
@@ -375,12 +380,17 @@ namespace db {
 
             case CondType::POS_Y: {
                 float py = fighter.getPosition().y;
+                float compareVal = rhsFloat;
+                if (!rhsExpr.empty()) {
+                    compareVal = static_cast<float>(evaluateCNSExpression(rhsExpr, fighter));
+                }
                 switch (op) {
-                    case CondOp::EQ:  result = (std::abs(py - rhsFloat) < 0.1f); break;
-                    case CondOp::GT:  result = (py > rhsFloat); break;
-                    case CondOp::GTE: result = (py >= rhsFloat); break;
-                    case CondOp::LT:  result = (py < rhsFloat); break;
-                    case CondOp::LTE: result = (py <= rhsFloat); break;
+                    case CondOp::EQ:  result = (std::abs(py - compareVal) < 0.1f); break;
+                    case CondOp::GT:  result = (py > compareVal); break;
+                    case CondOp::GTE: result = (py >= compareVal); break;
+                    case CondOp::LT:  result = (py < compareVal); break;
+                    case CondOp::LTE: result = (py <= compareVal); break;
+                    case CondOp::NEQ: result = (std::abs(py - compareVal) >= 0.1f); break;
                     default: result = (py == 0);
                 }
                 break;
@@ -573,6 +583,26 @@ namespace db {
         std::string str = trimStr(condStr);
         if (str.empty()) return result;
 
+        // 顶层分割 && (M.U.G.E.N 逻辑 AND)
+        {
+            int depth = 0;
+            size_t start = 0;
+            for (size_t i = 0; i < str.size(); i++) {
+                if (str[i] == '(') depth++;
+                else if (str[i] == ')') depth--;
+                else if (depth == 0 && i + 1 < str.size() && str[i] == '&' && str[i + 1] == '&') {
+                    auto subResults = parseConditionString(str.substr(start, i - start));
+                    result.insert(result.end(), subResults.begin(), subResults.end());
+                    start = i + 2;
+                }
+            }
+            if (!result.empty()) {
+                auto subResults = parseConditionString(str.substr(start));
+                result.insert(result.end(), subResults.begin(), subResults.end());
+                return result;
+            }
+        }
+
         // 检查是否有 NOT (!)
         bool negated = false;
         if (str[0] == '!') {
@@ -714,19 +744,19 @@ namespace db {
             }
             else if (lhsLower == "vel x" || lhsLower == "velx") {
                 cond.type = CondType::VEL_X;
-                try { cond.rhsFloat = std::stof(rhs); } catch(...) { cond.rhsFloat = 0.f; }
+                try { cond.rhsFloat = std::stof(rhs); } catch(...) { cond.rhsFloat = 0.f; cond.rhsExpr = rhs; }
             }
             else if (lhsLower == "vel y" || lhsLower == "vely") {
                 cond.type = CondType::VEL_Y;
-                try { cond.rhsFloat = std::stof(rhs); } catch(...) { cond.rhsFloat = 0.f; }
+                try { cond.rhsFloat = std::stof(rhs); } catch(...) { cond.rhsFloat = 0.f; cond.rhsExpr = rhs; }
             }
             else if (lhsLower == "pos y" || lhsLower == "posy") {
                 cond.type = CondType::POS_Y;
-                try { cond.rhsFloat = std::stof(rhs); } catch(...) { cond.rhsFloat = 0.f; }
+                try { cond.rhsFloat = std::stof(rhs); } catch(...) { cond.rhsFloat = 0.f; cond.rhsExpr = rhs; }
             }
             else if (lhsLower == "pos x" || lhsLower == "posx") {
                 cond.type = CondType::POS_X;
-                try { cond.rhsFloat = std::stof(rhs); } catch(...) { cond.rhsFloat = 0.f; }
+                try { cond.rhsFloat = std::stof(rhs); } catch(...) { cond.rhsFloat = 0.f; cond.rhsExpr = rhs; }
             }
             else if (lhsLower == "roundno") {
                 cond.type = CondType::ROUNDNO;
@@ -858,9 +888,44 @@ namespace db {
         std::string s = trimStr(cond);
         if (s.empty()) return 0;
 
-        // 去掉外层括号
+        // 处理 || (OR) — 在顶层深度=0 时分割
+        {
+            int depth = 0;
+            for (size_t i = 0; i < s.size(); i++) {
+                if (s[i] == '(') depth++;
+                else if (s[i] == ')') depth--;
+                else if (depth == 0 && i + 1 < s.size() && s[i] == '|' && s[i + 1] == '|') {
+                    if (evaluateCNSBool(s.substr(0, i), fighter)) return 1;
+                    return evaluateCNSBool(s.substr(i + 2), fighter);
+                }
+            }
+        }
+
+        // 处理 && (AND) — 在顶层深度=0 时分割
+        {
+            int depth = 0;
+            for (size_t i = 0; i < s.size(); i++) {
+                if (s[i] == '(') depth++;
+                else if (s[i] == ')') depth--;
+                else if (depth == 0 && i + 1 < s.size() && s[i] == '&' && s[i + 1] == '&') {
+                    if (!evaluateCNSBool(s.substr(0, i), fighter)) return 0;
+                    return evaluateCNSBool(s.substr(i + 2), fighter);
+                }
+            }
+        }
+
+        // 去掉外层匹配括号 (检查是否真的是匹配的一对)
         while (s.size() >= 2 && s.front() == '(' && s.back() == ')') {
-            s = trimStr(s.substr(1, s.size() - 2));
+            int depth = 0;
+            bool properPair = true;
+            for (size_t i = 0; i < s.size(); i++) {
+                if (s[i] == '(') depth++;
+                else if (s[i] == ')') depth--;
+                if (depth == 0 && i != s.size() - 1) { properPair = false; break; }
+            }
+            if (properPair && depth == 0) {
+                s = trimStr(s.substr(1, s.size() - 2));
+            } else break;
         }
 
         std::string lower = s;
@@ -894,6 +959,23 @@ namespace db {
 
                 int lhsVal = evaluateCNSExpression(lhs, fighter);
                 int rhsVal = evaluateCNSExpression(rhs, fighter);
+                bool result = false;
+                std::string opStr = opC;
+
+                // 处理 [low,high] 范围语法: "anim = [5051,5059]"
+                if (rhs.size() >= 2 && rhs[0] == '[' && rhs.back() == ']') {
+                    std::string rangeContent = rhs.substr(1, rhs.size() - 2);
+                    size_t commaPos = rangeContent.find(',');
+                    if (commaPos != std::string::npos) {
+                        int rangeLow = evaluateCNSExpression(rangeContent.substr(0, commaPos), fighter);
+                        int rangeHigh = evaluateCNSExpression(rangeContent.substr(commaPos + 1), fighter);
+                        bool inRange = (lhsVal >= rangeLow && lhsVal <= rangeHigh);
+                        if (opStr == "=")  result = inRange;
+                        else if (opStr == "!=") result = !inRange;
+                        else result = (lhsVal == rangeLow); // fallback
+                        return result ? 1 : 0;
+                    }
+                }
 
                 if (lhsLower == "statetype") {
                     int st = fighter.getStateType(); // 0=S, 1=C, 2=A
@@ -903,8 +985,6 @@ namespace db {
                     lhsVal = st;
                 }
 
-                bool result = false;
-                std::string opStr = opC;
                 if (opStr == "=")  result = (lhsVal == rhsVal);
                 else if (opStr == "!=") result = (lhsVal != rhsVal);
                 else if (opStr == ">")  result = (lhsVal > rhsVal);
@@ -932,10 +1012,21 @@ namespace db {
             s = trimStr(s.substr(1));
         }
 
-        // 去掉外层括号 → 布尔条件
+        // 去掉外层括号 → 数值或布尔表达式
         if (s.size() >= 2 && s.front() == '(' && s.back() == ')') {
-            int val = evaluateCNSBool(s, fighter);
-            return negated ? (val ? 0 : 1) : val;
+            std::string inner = trimStr(s.substr(1, s.size() - 2));
+            // 如果内部含比较操作符 → 布尔求值; 否则 → 数值求值
+            bool isComparison = false;
+            for (const auto& op : {"!=", "=", "<=", ">=", "<", ">"}) {
+                if (inner.find(op) != std::string::npos) { isComparison = true; break; }
+            }
+            if (isComparison) {
+                int val = evaluateCNSBool(inner, fighter);
+                return negated ? (val ? 0 : 1) : val;
+            } else {
+                int val = evaluateCNSExpression(inner, fighter);
+                return negated ? -val : val;
+            }
         }
 
         // ifelse(cond, trueVal, falseVal)
@@ -984,6 +1075,15 @@ namespace db {
             std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
             if (lower == "statetype") {
                 return fighter.getStateType(); // 0=S, 1=C, 2=A
+            }
+        }
+
+        // anim 关键字 → 当前动画 ID
+        {
+            std::string lower = s;
+            std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
+            if (lower == "anim") {
+                return negated ? -fighter.getCurrentAnimId() : fighter.getCurrentAnimId();
             }
         }
 
@@ -1102,8 +1202,18 @@ namespace db {
     }
     void VelAddController::execute(Fighter& fighter, InputManager* inputMgr, float dt) const {
         float addX = valueX;
+        if (!valueXStr.empty()) {
+            addX = static_cast<float>(evaluateCNSExpression(valueXStr, fighter));
+        }
         if (!fighter.isFacingRight()) { addX = -addX; }
-        fighter.addVelocity(addX, valueY);
+        float addY = valueY;
+        if (!valueYStr.empty()) {
+            addY = static_cast<float>(evaluateCNSExpression(valueYStr, fighter));
+        }
+        // 注意: GetHitVar(yaccel) 已经预乘以 60 (返回 26 ≈ 0.44*60),
+        // 所以这里不做 ×60 转换，直接加。
+        // 对于字面值 y = N (在 px/tick 单位), 需要调用方自行 ×60。
+        fighter.addVelocity(addX, addY);
     }
 
     // --- VelMul ---

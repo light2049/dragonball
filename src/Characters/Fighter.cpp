@@ -298,10 +298,6 @@ namespace db {
             case 3: default: gravity = 0.f; friction = 1.f; applyGroundCollision = false; break;
         }
 
-        // 受击状态(physics=N)时施加最小引力, 防止浮空卡在屏幕边缘
-        if (m_moveType == 2 && m_physicsType == 3 && gravity == 0.f) {
-            gravity = m_moveData.yaccel * 3600.f;
-        }
 
         m_velocity.y += gravity * dt;
         m_position += m_velocity * dt;
@@ -602,6 +598,13 @@ namespace db {
                 requestStateChange(0);
             }
         }
+        // 安全兜底: 任何状态超过 600 ticks (10秒) 未切换则强制回待机
+        if (m_currentStateNo != 0 && m_stateRegistry.hasState(m_currentStateNo)) {
+            int stateTicks = static_cast<int>(m_stateTimer * 60.f);
+            if (stateTicks > 600) {
+                requestStateChange(0);
+            }
+        }
 
         // ==========================================
         // 8. 每帧清除命中标志 (让 movehit 只在下帧状态执行前可见)
@@ -724,10 +727,6 @@ namespace db {
             case 3: default: gravity = 0.f; friction = 1.f; applyGroundCollision = false; break;
         }
 
-        // 受击状态(physics=N)时施加最小引力, 防止浮空卡在屏幕边缘
-        if (m_moveType == 2 && m_physicsType == 3 && gravity == 0.f) {
-            gravity = m_moveData.yaccel * 3600.f;
-        }
 
         m_velocity.y += gravity * dt;
         m_position += m_velocity * dt;
@@ -961,40 +960,52 @@ namespace db {
         }
     }
 
-    // 修改 getActiveHitbox：读取 Clsn1（攻击框）
+    // 修改 getActiveHitbox：读取所有 Clsn1（攻击框）并计算整体包围盒
     sf::FloatRect Fighter::getActiveHitbox() const {
         const auto& frame = m_animationPlayer.getCurrentFrame();
-        // 攻击框存储在 clsn1 中（符合 Mugen 规范）
         if (frame.clsn1.empty()) return {};
 
-        // Clsn 框相对于轴位置 (m_position)，不使用精灵偏移
         constexpr sf::Vector2f zeroOffset{0.f, 0.f};
-        const auto& clsn = frame.clsn1[0];
-        sf::Vector2f p1 = LocalToWorld({static_cast<float>(clsn.topLeft.x), static_cast<float>(clsn.topLeft.y)}, m_position, zeroOffset, isFacingRight());
-        sf::Vector2f p2 = LocalToWorld({static_cast<float>(clsn.bottomRight.x), static_cast<float>(clsn.bottomRight.y)}, m_position, zeroOffset, isFacingRight());
-
-        return sf::FloatRect{
-                {std::min(p1.x, p2.x), std::min(p1.y, p2.y)},
-                {std::abs(p2.x - p1.x), std::abs(p2.y - p1.y)}
-        };
+        bool first = true;
+        float minX = 0, minY = 0, maxX = 0, maxY = 0;
+        for (const auto& clsn : frame.clsn1) {
+            sf::Vector2f p1 = LocalToWorld({static_cast<float>(clsn.topLeft.x), static_cast<float>(clsn.topLeft.y)}, m_position, zeroOffset, isFacingRight());
+            sf::Vector2f p2 = LocalToWorld({static_cast<float>(clsn.bottomRight.x), static_cast<float>(clsn.bottomRight.y)}, m_position, zeroOffset, isFacingRight());
+            float rx1 = std::min(p1.x, p2.x), ry1 = std::min(p1.y, p2.y);
+            float rx2 = std::max(p1.x, p2.x), ry2 = std::max(p1.y, p2.y);
+            if (first) {
+                minX = rx1; minY = ry1; maxX = rx2; maxY = ry2;
+                first = false;
+            } else {
+                minX = std::min(minX, rx1); minY = std::min(minY, ry1);
+                maxX = std::max(maxX, rx2); maxY = std::max(maxY, ry2);
+            }
+        }
+        return sf::FloatRect{{minX, minY}, {maxX - minX, maxY - minY}};
     }
 
-    // 修改 getActiveHurtbox：读取 Clsn2（受击框）
+    // 修改 getActiveHurtbox：读取所有 Clsn2（受击框）并计算整体包围盒
     sf::FloatRect Fighter::getActiveHurtbox() const {
         const auto& frame = m_animationPlayer.getCurrentFrame();
-        // 受击框存储在 clsn2 中（符合 Mugen 规范）
         if (frame.clsn2.empty()) return {};
 
-        // Clsn 框相对于轴位置 (m_position)，不使用精灵偏移
         constexpr sf::Vector2f zeroOffset{0.f, 0.f};
-        const auto& clsn = frame.clsn2[0];
-        sf::Vector2f p1 = LocalToWorld({static_cast<float>(clsn.topLeft.x), static_cast<float>(clsn.topLeft.y)}, m_position, zeroOffset, isFacingRight());
-        sf::Vector2f p2 = LocalToWorld({static_cast<float>(clsn.bottomRight.x), static_cast<float>(clsn.bottomRight.y)}, m_position, zeroOffset, isFacingRight());
-
-        return sf::FloatRect{
-                {std::min(p1.x, p2.x), std::min(p1.y, p2.y)},
-                {std::abs(p2.x - p1.x), std::abs(p2.y - p1.y)}
-        };
+        bool first = true;
+        float minX = 0, minY = 0, maxX = 0, maxY = 0;
+        for (const auto& clsn : frame.clsn2) {
+            sf::Vector2f p1 = LocalToWorld({static_cast<float>(clsn.topLeft.x), static_cast<float>(clsn.topLeft.y)}, m_position, zeroOffset, isFacingRight());
+            sf::Vector2f p2 = LocalToWorld({static_cast<float>(clsn.bottomRight.x), static_cast<float>(clsn.bottomRight.y)}, m_position, zeroOffset, isFacingRight());
+            float rx1 = std::min(p1.x, p2.x), ry1 = std::min(p1.y, p2.y);
+            float rx2 = std::max(p1.x, p2.x), ry2 = std::max(p1.y, p2.y);
+            if (first) {
+                minX = rx1; minY = ry1; maxX = rx2; maxY = ry2;
+                first = false;
+            } else {
+                minX = std::min(minX, rx1); minY = std::min(minY, ry1);
+                maxX = std::max(maxX, rx2); maxY = std::max(maxY, ry2);
+            }
+        }
+        return sf::FloatRect{{minX, minY}, {maxX - minX, maxY - minY}};
     }
 
     sf::FloatRect Fighter::getPushBox() const {

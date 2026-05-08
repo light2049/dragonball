@@ -253,6 +253,7 @@ namespace db {
                     auto p = parsePair<float>(value);
                     states[currentStateNo].velsetX = p.first;
                     states[currentStateNo].velsetY = p.second;
+                    states[currentStateNo].hasVelset = true;
                 }
                 else if (lowerKey == "anim") {
                     try { states[currentStateNo].anim = std::stoi(value); } catch (...) {}
