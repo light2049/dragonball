@@ -107,7 +107,10 @@ namespace db {
         if (path == "movement.airjump.num")      return static_cast<float>(m_moveData.airjumpNum);
         if (path == "movement.airjump.height")   return static_cast<float>(m_moveData.airjumpHeight);
         if (path == "movement.stand.friction.threshold")  return 0.5f;  // M.U.G.E.N 默认阈值
-        if (path == "movement.air.gethit.groundlevel")   return m_groundLevel;  // 地面阈值
+        if (path == "movement.air.gethit.groundlevel") {
+            // 根据当前动画帧偏移量计算地面高度, 使 Pos Y >= groundlevel 等价于触及地面
+            return GROUND_Y - static_cast<float>(m_animationPlayer.getCurrentFrame().offset.y);
+        }
         if (path == "movement.crouch.friction.threshold") return 0.5f;
         return 0.0f;
     }
@@ -148,11 +151,9 @@ namespace db {
     void Fighter::switchAnimation(int animId) {
         if (m_animations.contains(animId)) {
             m_animationPlayer.play(m_animations.at(animId));
-            std::string msg = "[Fighter] switchAnimation: " + std::to_string(animId) + " OK\n";
-            logMsg(msg.c_str());
         } else {
-            std::string msg = "[Fighter] switchAnimation: " + std::to_string(animId) + " NOT FOUND!\n";
-            logMsg(msg.c_str());
+            //std::string msg = "[Fighter] switchAnimation: " + std::to_string(animId) + " NOT FOUND!\n";
+            //logMsg(msg.c_str());
         }
     }
 
@@ -167,24 +168,23 @@ namespace db {
         bool hasAnim = m_animations.contains(stateNo);
 
         if (!isEngineState && !hasCnsDef && !hasAnim) {
-            std::string msg = "[Fighter] State " + std::to_string(stateNo) + " has neither CNS def nor animation!\n";
-            logMsg(msg.c_str());
-            std::cerr << "[Fighter] State " << stateNo << " has neither CNS def nor animation!\n";
+            //std::string msg = "[Fighter] State " + std::to_string(stateNo) + " has neither CNS def nor animation!\n";
+            //logMsg(msg.c_str());
             return;
         }
 
-        // DEBUG: log whether we have CNS def for this state
-        {
-            std::string msg = "[Fighter] requestStateChange(" + std::to_string(stateNo)
-                + "): hasCnsDef=" + (hasCnsDef ? "1" : "0")
-                + " hasAnim=" + (hasAnim ? "1" : "0") + "\n";
-            logMsg(msg.c_str());
-        }
-
-        {
-            std::string msg = "[Fighter] State: " + std::to_string(m_currentStateNo) + " -> " + std::to_string(stateNo) + "\n";
-            logMsg(msg.c_str());
-        }
+        // DEBUG: log whether we have CNS def for this state (禁用: 日志过多)
+        //{
+        //    std::string msg = "[Fighter] requestStateChange(" + std::to_string(stateNo)
+        //        + "): hasCnsDef=" + (hasCnsDef ? "1" : "0")
+        //        + " hasAnim=" + (hasAnim ? "1" : "0") + "\n";
+        //    logMsg(msg.c_str());
+        //}
+        //
+        //{
+        //    std::string msg = "[Fighter] State: " + std::to_string(m_currentStateNo) + " -> " + std::to_string(stateNo) + "\n";
+        //    logMsg(msg.c_str());
+        //}
         m_previousStateNo = m_currentStateNo;
         m_currentStateNo = stateNo;
         m_stateTimer = 0.0f;
@@ -232,15 +232,15 @@ namespace db {
             }
         }
 
-        // Debug: log ctrl state after transition
-        {
-            std::string msg = "[Fighter] requestStateChange to " + std::to_string(stateNo)
-                + " done. ctrl=" + std::to_string(m_hasControl)
-                + " moveType=" + std::to_string(m_moveType)
-                + " stateType=" + std::to_string(m_stateType)
-                + " anim=" + std::to_string(m_animationPlayer.getCurrentAnimId()) + "\n";
-            logMsg(msg.c_str());
-        }
+        // Debug: log ctrl state after transition (禁用: 日志过多)
+        //{
+        //    std::string msg = "[Fighter] requestStateChange to " + std::to_string(stateNo)
+        //        + " done. ctrl=" + std::to_string(m_hasControl)
+        //        + " moveType=" + std::to_string(m_moveType)
+        //        + " stateType=" + std::to_string(m_stateType)
+        //        + " anim=" + std::to_string(m_animationPlayer.getCurrentAnimId()) + "\n";
+        //    logMsg(msg.c_str());
+        //}
 
         // 引擎级重置: 进入待机/攻击状态时清除命中标志
         if (m_moveType == 0) { // I = Idle
@@ -269,7 +269,7 @@ namespace db {
         if (isDead() && m_currentStateNo != 5150 && m_currentStateNo != 180 && m_currentStateNo != 5100) return;
         m_opponentPos = opponentPos;
         dt = std::min(dt, 0.05f);
-        m_stateTimer += dt;
+        // m_stateTimer += dt;  // 已挪到 CNS 执行之后 (使 Time=0 能在首帧触发)
 
         // Diag: print movehit/movecontact flags at start of every frame in state 600
         if (m_currentStateNo == 600) {
@@ -551,6 +551,8 @@ namespace db {
         m_stateRegistry.executeState(-2, *this, &inputMgr, dt);
         // 5b. 执行 State -3 (角色自身每帧执行, 如 shadow aura, 落地音效等)
         m_stateRegistry.executeState(-3, *this, &inputMgr, dt);
+        // 状态计时器在 CNS 执行后递增, 确保首帧 Time=0 能触发
+        m_stateTimer += dt;
         // 5.1 保存 HitDefs 到缓存
         {
             const auto& hd = m_stateRegistry.getHitDefs(m_currentStateNo);

@@ -83,15 +83,15 @@ namespace db {
             fighter.setControl(defaultCtrl);
         }
 
-        // DEBUG: log state attribute application
-        {
-            std::string msg = "[StateRegistry] applyStateAttrs state=" + std::to_string(stateNo)
-                + " ctrl_param=" + std::to_string(s.ctrl)
-                + " movetype=" + std::to_string(s.movetype)
-                + " result_ctrl=" + (fighter.hasControl() ? "1" : "0") + "\n";
-            FILE* f = fopen("D:\\DragonBall\\build\\fighter_log.txt", "a");
-            if (f) { fprintf(f, "%s", msg.c_str()); fclose(f); }
-        }
+        // DEBUG: log state attribute application (禁用: 日志过多)
+        //{
+        //    std::string msg = "[StateRegistry] applyStateAttrs state=" + std::to_string(stateNo)
+        //        + " ctrl_param=" + std::to_string(s.ctrl)
+        //        + " movetype=" + std::to_string(s.movetype)
+        //        + " result_ctrl=" + (fighter.hasControl() ? "1" : "0") + "\n";
+        //    FILE* f = fopen("D:\\DragonBall\\build\\fighter_log.txt", "a");
+        //    if (f) { fprintf(f, "%s", msg.c_str()); fclose(f); }
+        //}
 
         // 初始速度
         if (s.velsetX != 0.f || s.velsetY != 0.f) {

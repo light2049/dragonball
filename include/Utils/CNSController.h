@@ -55,6 +55,8 @@ namespace db {
         COMMAND_COUNT,  // command != "xxx" 等
         HITFALL,        // HitFall (布尔)
         PARENT_STATENO, // parent,stateno = N
+        FRONTEDGEBODYDIST, // FrontEdgeBodyDist (画面边缘距离)
+        BACKEDGEBODYDIST,  // BackEdgeBodyDist (画面边缘距离)
         // 字面量 (用于比较)
         LITERAL_TRUE,   // 永真
         LITERAL_FALSE,  // 永假
@@ -191,6 +193,8 @@ namespace db {
         std::string valueXStr; // x 表达式字符串 (如 const(velocity.walk.fwd.x))
         std::string valueYStr; // y 表达式字符串
         std::string valueStr;  // 字符串值
+        int persistent = 1;    // M.U.G.E.N: 0=触发一次后禁用, 1=每次触发
+        mutable int m_firedThisState = -1; // 本状态中是否已触发(-1=未进状态, 0=未触发, 1=已触发)
     };
 
     // ==========================================

@@ -115,7 +115,12 @@ namespace db {
     }
 
     bool CNSController::checkTriggers(const Fighter& fighter, const InputManager* inputMgr, int stateTime) const {
-        if (triggers.empty()) return true; // 没有 trigger = 总是执行
+        if (triggers.empty()) return true;
+
+        // persistent=0: 同一状态下只触发一次
+        if (persistent == 0 && m_firedThisState == fighter.getCurrentStateNo()) {
+            return false;
+        }
 
         // M.U.G.E.N 规则: triggerall 必须全部满足
         // 然后 trigger1, trigger2, ... 中任何一个满足即可
@@ -137,7 +142,10 @@ namespace db {
                     break;
                 }
             }
-            if (allMet) return true; // 任一 trigger 满足即可
+            if (allMet) {
+                if (persistent == 0) m_firedThisState = fighter.getCurrentStateNo();
+                return true;
+            }
         }
 
         return false;
@@ -328,13 +336,15 @@ namespace db {
                 float vx = fighter.getVelocityX();
                 // M.U.G.E.N: vel x 是相对于角色朝向
                 if (!fighter.isFacingRight()) { vx = -vx; }
+                // CNS 速度单位为 px/tick, 引擎为 px/s, 转换 RHS
+                float compareVal = rhsFloat * 60.f;
                 switch (op) {
-                    case CondOp::GT:  result = (vx > rhsFloat); break;
-                    case CondOp::GTE: result = (vx >= rhsFloat); break;
-                    case CondOp::LT:  result = (vx < rhsFloat); break;
-                    case CondOp::LTE: result = (vx <= rhsFloat); break;
-                    case CondOp::EQ:  result = (std::abs(vx - rhsFloat) < 0.1f); break;
-                    case CondOp::NEQ: result = (std::abs(vx - rhsFloat) >= 0.1f); break;
+                    case CondOp::GT:  result = (vx > compareVal); break;
+                    case CondOp::GTE: result = (vx >= compareVal); break;
+                    case CondOp::LT:  result = (vx < compareVal); break;
+                    case CondOp::LTE: result = (vx <= compareVal); break;
+                    case CondOp::EQ:  result = (std::abs(vx - compareVal) < 0.1f); break;
+                    case CondOp::NEQ: result = (std::abs(vx - compareVal) >= 0.1f); break;
                     default: result = (vx > 0);
                 }
                 break;
@@ -342,13 +352,15 @@ namespace db {
 
             case CondType::VEL_Y: {
                 float vy = fighter.getVelocityY();
+                // CNS 速度单位为 px/tick, 引擎为 px/s, 转换 RHS
+                float compareVal = rhsFloat * 60.f;
                 switch (op) {
-                    case CondOp::GT:  result = (vy > rhsFloat); break;
-                    case CondOp::GTE: result = (vy >= rhsFloat); break;
-                    case CondOp::LT:  result = (vy < rhsFloat); break;
-                    case CondOp::LTE: result = (vy <= rhsFloat); break;
-                    case CondOp::EQ:  result = (std::abs(vy - rhsFloat) < 0.1f); break;
-                    case CondOp::NEQ: result = (std::abs(vy - rhsFloat) >= 0.1f); break;
+                    case CondOp::GT:  result = (vy > compareVal); break;
+                    case CondOp::GTE: result = (vy >= compareVal); break;
+                    case CondOp::LT:  result = (vy < compareVal); break;
+                    case CondOp::LTE: result = (vy <= compareVal); break;
+                    case CondOp::EQ:  result = (std::abs(vy - compareVal) < 0.1f); break;
+                    case CondOp::NEQ: result = (std::abs(vy - compareVal) >= 0.1f); break;
                     default: result = (vy > 0);
                 }
                 break;
@@ -481,6 +493,31 @@ namespace db {
             case CondType::CONST: {
                 // const() 简化处理 — 返回默认 true
                 result = true;
+                break;
+            }
+
+            case CondType::FRONTEDGEBODYDIST:
+            case CondType::BACKEDGEBODYDIST: {
+                // 画面边缘距离 (M.U.G.E.N: FrontEdgeBodyDist/BackEdgeBodyDist)
+                // 舞台边界 [0, 800]
+                sf::FloatRect pushBox = fighter.getPushBox();
+                float frontDist, backDist;
+                if (fighter.isFacingRight()) {
+                    frontDist = 800.f - (pushBox.position.x + pushBox.size.x);
+                    backDist = pushBox.position.x;
+                } else {
+                    frontDist = pushBox.position.x;
+                    backDist = 800.f - (pushBox.position.x + pushBox.size.x);
+                }
+                float dist = (type == CondType::FRONTEDGEBODYDIST) ? frontDist : backDist;
+                switch (op) {
+                    case CondOp::EQ:  result = (dist <= rhsInt); break;
+                    case CondOp::GT:  result = (dist > rhsInt); break;
+                    case CondOp::GTE: result = (dist >= rhsInt); break;
+                    case CondOp::LT:  result = (dist < rhsInt); break;
+                    case CondOp::LTE: result = (dist <= rhsInt); break;
+                    default: result = (dist <= rhsInt); break;
+                }
                 break;
             }
 
@@ -730,6 +767,14 @@ namespace db {
             else if (lhsLower == "p2bodydist x") {
                 cond.type = CondType::P2BODYDIST_X;
                 try { cond.rhsFloat = std::stof(rhs); } catch(...) { cond.rhsFloat = 0.f; }
+            }
+            else if (lhsLower == "frontedgebodydist") {
+                cond.type = CondType::FRONTEDGEBODYDIST;
+                try { cond.rhsInt = std::stoi(rhs); } catch(...) { cond.rhsInt = 0; }
+            }
+            else if (lhsLower == "backedgebodydist") {
+                cond.type = CondType::BACKEDGEBODYDIST;
+                try { cond.rhsInt = std::stoi(rhs); } catch(...) { cond.rhsInt = 0; }
             }
             else if (lhsLower == "movehit")         cond.type = CondType::MOVEHIT;
             else if (lhsLower == "movecontact")     cond.type = CondType::MOVECONTACT;
@@ -1560,12 +1605,15 @@ namespace db {
     HitVelSetController::HitVelSetController() { type = ControllerType::HITVELSET; }
     void HitVelSetController::execute(Fighter& fighter, InputManager* inputMgr, float dt) const {
         const auto& info = fighter.getHitInfo();
-        if (hasX && info.groundVelocityX != 0.f) {
-            float vx = info.groundVelocityX * valueX * 60.f;
+        // M.U.G.E.N: type=S/C 使用地面速度, type=A 使用空中速度
+        bool useAir = (fighter.getStateType() == 2); // A=2
+
+        if (hasX) {
+            float vx = (useAir ? info.airVelocityX : info.groundVelocityX) * valueX * 60.f;
             fighter.setVelocityX(vx);
         }
         if (hasY) {
-            float vy = (info.groundVelocityY != 0.f ? info.groundVelocityY : info.airVelocityY) * valueY * 60.f;
+            float vy = (useAir ? info.airVelocityY : info.groundVelocityY) * valueY * 60.f;
             fighter.setVelocityY(vy);
         }
     }

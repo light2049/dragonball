@@ -371,8 +371,10 @@ namespace db {
             m_player->executeCurrentStateCNS(nullptr, dt);
         }
 
-        // 5. 物理碰撞 (推撞)
+        // 5. 物理碰撞 (推撞) + 场景边界
         handlePushCollision();
+        if (m_player) clampFighterToStage(*m_player);
+        if (m_dummy) clampFighterToStage(*m_dummy);
 
         // 6. 更新 Helper (飞行道具 + CNS 执行)
         for (auto& h : m_helpers) {
@@ -649,9 +651,9 @@ namespace db {
             }
 
             int targetState = 5000;
-            if (info.p2stateno > 0) {
-                targetState = info.p2stateno;
-            } else {
+            // p2stateno 暂不使用 (自定义受击状态依赖 M.U.G.E.N 精确物理)
+            // if (info.p2stateno > 0) { targetState = info.p2stateno; } else
+            {
                 std::string type = info.animtype;
                 if (type == "Light" || type == "light") targetState = 5000;
                 else if (type == "Medium" || type == "medium") targetState = 5001;
@@ -699,6 +701,23 @@ namespace db {
                 }
             }
         }
+    }
+
+    void Game::clampFighterToStage(Fighter& fighter) {
+        // M.U.G.E.N 标准舞台边界
+        const float STAGE_LEFT = 0.f;
+        const float STAGE_RIGHT = 800.f;  // 匹配窗口宽度
+        const float STAGE_TOP = 0.f;
+        sf::Vector2f pos = fighter.getPosition();
+        sf::FloatRect pushBox = fighter.getPushBox();
+        float halfWidth = pushBox.size.x * 0.5f;
+        if (pos.x - halfWidth < STAGE_LEFT) pos.x = STAGE_LEFT + halfWidth;
+        if (pos.x + halfWidth > STAGE_RIGHT) pos.x = STAGE_RIGHT - halfWidth;
+        if (pos.y < STAGE_TOP) {
+            pos.y = STAGE_TOP;
+            if (fighter.getVelocityY() < 0.f) fighter.setVelocityY(0.f);
+        }
+        fighter.setPosition(pos.x, pos.y);
     }
 
     void Game::render() {

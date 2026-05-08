@@ -491,6 +491,9 @@ namespace db {
                         } catch (...) {}
                     }
                 }
+                else if (lowerKey == "persistent") {
+                    try { currentController->persistent = std::stoi(value); } catch (...) {}
+                }
                 else {
                     // 委托给控制器的 parse 方法
                     currentController->parse(key, value);
