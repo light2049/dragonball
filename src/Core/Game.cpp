@@ -491,26 +491,29 @@ namespace db {
                                                 auto hitPos = hb.findIntersection(hurt);
                                                 target->takeDamage(hd.damage);
 
-                                                // 设置受击信息 (击退、停顿、状态)
+                                                // 直接应用击退速度, 不依赖受击状态链的 HitVelSet
+                                                float dir = h.facingRight ? 1.f : -1.f;
+                                                target->setVelocityX(hd.groundVelocityX * 60.f * dir);
+                                                target->setVelocityY(hd.airVelocityY * 60.f);
+
+                                                // 设置 HitInfo 供 CNS 条件使用
                                                 HitInfo hitInfo;
                                                 hitInfo.damage = hd.damage;
-                                                hitInfo.guardDamage = hd.guardDamage;
                                                 hitInfo.groundVelocityX = hd.groundVelocityX;
                                                 hitInfo.airVelocityX = hd.airVelocityX;
                                                 hitInfo.airVelocityY = hd.airVelocityY;
                                                 hitInfo.animtype = hd.animtype;
                                                 hitInfo.groundHittime = hd.groundHittime > 0 ? hd.groundHittime : 15;
-                                                hitInfo.groundSlidetime = hd.groundSlidetime > 0 ? hd.groundSlidetime : 15;
                                                 hitInfo.fall = hd.fall;
                                                 target->setHitInfo(hitInfo);
 
-                                                // 受击方进入 hit 状态 (由 HitDef 的 animtype 决定)
-                                                int targetState = 5000;
+                                                // 进入受击状态
                                                 std::string at = hd.animtype;
                                                 std::transform(at.begin(), at.end(), at.begin(), ::tolower);
-                                                if (at == "medium") targetState = 5001;
-                                                else if (at == "hard") targetState = 5002;
-                                                target->requestStateChange(targetState);
+                                                int ts = 5000;
+                                                if (at == "medium") ts = 5001;
+                                                else if (at == "hard") ts = 5002;
+                                                target->requestStateChange(ts);
 
                                                 if (hitPos.has_value()) {
                                                     spawnSpark(hd.sparkno > 0 ? hd.sparkno : 1200, {

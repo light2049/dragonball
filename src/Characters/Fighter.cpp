@@ -269,7 +269,7 @@ namespace db {
         if (isDead() && m_currentStateNo != 5150 && m_currentStateNo != 180 && m_currentStateNo != 5100) return;
         m_opponentPos = opponentPos;
         dt = std::min(dt, 0.05f);
-        // m_stateTimer += dt;  // 已挪到 CNS 执行之后 (使 Time=0 能在首帧触发)
+        m_stateTimer += dt;
 
         // Diag: print movehit/movecontact flags at start of every frame in state 600
         if (m_currentStateNo == 600) {
@@ -296,6 +296,11 @@ namespace db {
             case 1: gravity = m_moveData.yaccel * 3600.f; friction = m_moveData.crouchFriction; break;
             case 2: gravity = m_moveData.yaccel * 3600.f; friction = 1.f; break;
             case 3: default: gravity = 0.f; friction = 1.f; applyGroundCollision = false; break;
+        }
+
+        // 受击状态(physics=N)时施加最小引力, 防止浮空卡在屏幕边缘
+        if (m_moveType == 2 && m_physicsType == 3 && gravity == 0.f) {
+            gravity = m_moveData.yaccel * 3600.f;
         }
 
         m_velocity.y += gravity * dt;
@@ -553,8 +558,6 @@ namespace db {
         m_stateRegistry.executeState(-2, *this, &inputMgr, dt);
         // 5b. 执行 State -3 (角色自身每帧执行, 如 shadow aura, 落地音效等)
         m_stateRegistry.executeState(-3, *this, &inputMgr, dt);
-        // 状态计时器在 CNS 执行后递增, 确保首帧 Time=0 能触发
-        m_stateTimer += dt;
         // 5.1 保存 HitDefs 到缓存
         {
             const auto& hd = m_stateRegistry.getHitDefs(m_currentStateNo);
@@ -719,6 +722,11 @@ namespace db {
             case 1: gravity = m_moveData.yaccel * 3600.f; friction = m_moveData.crouchFriction; break;
             case 2: gravity = m_moveData.yaccel * 3600.f; friction = 1.f; break;
             case 3: default: gravity = 0.f; friction = 1.f; applyGroundCollision = false; break;
+        }
+
+        // 受击状态(physics=N)时施加最小引力, 防止浮空卡在屏幕边缘
+        if (m_moveType == 2 && m_physicsType == 3 && gravity == 0.f) {
+            gravity = m_moveData.yaccel * 3600.f;
         }
 
         m_velocity.y += gravity * dt;
