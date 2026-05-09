@@ -642,7 +642,8 @@ namespace db {
         );
         spawnSpark(hit.sparkno, contactPoint);
 
-        bool isGuarding = m_dummy->isGuarding();
+        // 如果攻击方有 unguardable 标志, 防御无效
+        bool isGuarding = m_dummy->isGuarding() && !(m_player->getAssertFlags() & 4);
         if (isGuarding) {
             m_player->setMoveGuarded(true);
         } else {

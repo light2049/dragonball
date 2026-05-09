@@ -471,7 +471,10 @@ namespace db {
     class MakeDustController : public CNSController {
     public:
         MakeDustController();
+        void parse(const std::string& key, const std::string& value) override;
         void execute(Fighter& fighter, InputManager* inputMgr, float dt) const override;
+        float m_posX = 0.f, m_posY = 0.f;
+        int m_spacing = 1;
     };
 
     // --- PalFX (调色板特效) ---

@@ -1667,7 +1667,9 @@ namespace db {
             while (std::getline(ss, flag, ',')) {
                 flag = trimStr(flag);
                 std::transform(flag.begin(), flag.end(), flag.begin(), ::tolower);
-                if (flag == "invisible") m_flags |= 1;
+                if (flag == "invisible")    m_flags |= 1;
+                if (flag == "noshadow")     m_flags |= 2;
+                if (flag == "unguardable")  m_flags |= 4;
             }
         }
     }
@@ -1757,12 +1759,29 @@ namespace db {
     // MakeDustController
     // ==========================================
     MakeDustController::MakeDustController() { type = ControllerType::MAKEDUST; }
+    void MakeDustController::parse(const std::string& key, const std::string& value) {
+        std::string lowerKey = key;
+        std::transform(lowerKey.begin(), lowerKey.end(), lowerKey.begin(), ::tolower);
+        if (lowerKey == "pos") {
+            size_t comma = value.find(',');
+            if (comma != std::string::npos) {
+                try { m_posX = std::stof(value.substr(0, comma)); } catch(...) {}
+                try { m_posY = std::stof(value.substr(comma + 1)); } catch(...) {}
+            }
+        } else if (lowerKey == "spacing") {
+            try { m_spacing = std::stoi(value); } catch(...) {}
+        }
+    }
     void MakeDustController::execute(Fighter& fighter, InputManager* inputMgr, float dt) const {
-        // MakeDust 创建灰尘粒子效果
-        // 简化实现: 在地面且速度足够快时创建 Explod
-        if (fighter.isGrounded() && std::abs(fighter.getVelocityX()) > 60.f) {
-            // 使用现有的 Explod/Particle 系统
-            // 暂时跳过，需要 Game 级支持
+        // 创建灰尘粒子 Explod (使用动画 1229 的落地灰尘)
+        if (fighter.doesAnimExist(1229)) {
+            ExplodInstance dust;
+            dust.animPlayer.play(*fighter.getAnimation(1229));
+            dust.pos = {m_posX, m_posY};
+            dust.sprpriority = -5;  // 低层级, 在角色脚下
+            dust.removetime = -2;    // 动画播完自动移除
+            dust.bindtime = 1;       // 跟随 1 帧
+            fighter.addExplod(std::move(dust));
         }
     }
 
