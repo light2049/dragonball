@@ -18,6 +18,7 @@ namespace {
 
 namespace db {
     bool Fighter::m_showDebug = true;
+    bool Fighter::m_showAnimDebug = false;
 
     Fighter::Fighter() : m_position(200.f, 480.f), m_velocity(0.f, 0.f), m_isGrounded(true) {
         m_currentStateNo = 0;
@@ -189,6 +190,12 @@ namespace db {
         m_currentStateNo = stateNo;
         m_stateTimer = 0.0f;
         m_hasHitCurrentAttack = false;
+
+        if (m_showAnimDebug) {
+            std::cout << "[StateChange] " << m_previousStateNo << " -> " << stateNo
+                      << " anim=" << m_animationPlayer.getCurrentAnimId()
+                      << " timer=0" << std::endl;
+        }
 
         // 回到待机时清理所有特效
         if (stateNo == 0) {
@@ -615,6 +622,23 @@ namespace db {
         // 9. 动画更新
         // ==========================================
         m_animationPlayer.update(dt);
+
+        // AnimDebug: 每帧输出动画状态
+        if (m_showAnimDebug && m_currentStateNo != 0) {
+            const auto& frame = m_animationPlayer.getCurrentFrame();
+            bool texOk = m_animationPlayer.getSpriteSize().x > 0;
+            int totalFrames = m_animationPlayer.getTotalFrames();
+            bool hasClsn1 = !frame.clsn1.empty();
+            std::cout << "[AnimTrace] state=" << m_currentStateNo
+                      << " anim=" << m_animationPlayer.getCurrentAnimId()
+                      << " elem=" << m_animationPlayer.getCurrentAnimElem() << "/" << totalFrames
+                      << " tick=" << static_cast<int>(m_stateTimer * 60.f)
+                      << " vel=(" << static_cast<int>(m_velocity.x) << "," << static_cast<int>(m_velocity.y) << ")"
+                      << " hitdef=" << (hasClsn1 ? 1 : 0)
+                      << " " << (texOk ? "OK" : "MISS")
+                      << " tex=" << frame.texturePath
+                      << std::endl;
+        }
 
         // 9.5 安全地面碰撞 (在 CNS PosSet 等可能修改位置后再次执行)
         if (getFeetY() >= GROUND_Y) {

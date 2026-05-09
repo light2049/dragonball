@@ -36,6 +36,8 @@ namespace db {
         int getCurrentAnimId() const;
         // 获取当前精灵的尺寸 (用于计算中心点)
         sf::Vector2f getSpriteSize() const;
+        // 获取当前动画的总帧数
+        int getTotalFrames() const { return m_currentAnimation ? static_cast<int>(m_currentAnimation->frames.size()) : 0; }
         int getCurrentFrameIndex() const { return static_cast<int>(m_currentFrameIndex); }
 
         // AnimElem: 当前动画帧序号 (1-based), 每次换帧递增

@@ -113,6 +113,8 @@ namespace db {
 
         static void setShowDebug(bool show) { m_showDebug = show; }
         static bool getShowDebug() { return m_showDebug; }
+        static void setAnimDebug(bool show) { m_showAnimDebug = show; }
+        static bool getAnimDebug() { return m_showAnimDebug; }
 
         bool isGuarding() const;
         void addPower(int amount);
@@ -401,5 +403,6 @@ namespace db {
         const float GROUND_Y = 480.f;
 
         static bool m_showDebug;
+        static bool m_showAnimDebug;
     };
 }

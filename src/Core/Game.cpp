@@ -146,6 +146,10 @@ namespace db {
                 if (key->code == sf::Keyboard::Key::F1) {
                     Fighter::setShowDebug(!Fighter::getShowDebug());
                 }
+                if (key->code == sf::Keyboard::Key::F3) {
+                    Fighter::setAnimDebug(!Fighter::getAnimDebug());
+                    std::cout << "[AnimDebug] " << (Fighter::getAnimDebug() ? "ON" : "OFF") << std::endl;
+                }
                 // Event-based key tracking: prevents quick taps from being missed
                 inputManager_.onKeyPressed(key->code);
             }
