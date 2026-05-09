@@ -1542,10 +1542,10 @@ namespace db {
         ph.stateNo = m_stateno;
         ph.position = pos;
         ph.velocity = {velX, velY};  // px/tick
-        std::cout << "[HelperCtrl] fire state=" << m_stateno
-                  << " parentState=" << fighter.getCurrentStateNo()
-                  << " moveContact=" << fighter.hasMoveContact()
-                  << " moveHit=" << fighter.hasMoveHit() << std::endl;
+        //std::cout << "[HelperCtrl] fire state=" << m_stateno
+        //          << " parentState=" << fighter.getCurrentStateNo()
+        //          << " moveContact=" << fighter.hasMoveContact()
+        //          << " moveHit=" << fighter.hasMoveHit() << std::endl;
         ph.facingRight = (m_facing == 1) ? fighter.isFacingRight() : !fighter.isFacingRight();
         ph.parentStateno = fighter.getCurrentStateNo();
         // 从攻击者的 HitDef 取伤害和火花

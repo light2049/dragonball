@@ -613,8 +613,8 @@ namespace db {
         if (++cbCount % 30 == 1) {
             sf::FloatRect hb = m_player->getActiveHitbox();
             sf::FloatRect hr = m_dummy->getActiveHurtbox();
-            std::cout << "[CB] hitbox=" << hb.position.x << "," << hb.position.y << " " << hb.size.x << "x" << hb.size.y
-                      << " hurtbox=" << hr.position.x << "," << hr.position.y << " " << hr.size.x << "x" << hr.size.y << std::endl;
+            //std::cout << "[CB] hitbox=" << hb.position.x << "," << hb.position.y << " " << hb.size.x << "x" << hb.size.y
+            //          << " hurtbox=" << hr.position.x << "," << hr.position.y << " " << hr.size.x << "x" << hr.size.y << std::endl;
         }
 
         const auto& hit = hitDefs[0];
