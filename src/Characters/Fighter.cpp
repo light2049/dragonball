@@ -372,7 +372,7 @@ namespace db {
         // 2. CMD 指令评估
         // ==========================================
         inputMgr.clearCommandResults();  // 清空上一帧缓存，确保 evaluate 读取实时按键
-        m_cmdParser.evaluate(inputMgr);
+        m_cmdParser.evaluate(inputMgr, isFacingRight());
         for (const auto& [name, def] : m_cmdParser.getCommands()) {
             inputMgr.setCommandResult(name, m_cmdParser.isActive(name));
         }

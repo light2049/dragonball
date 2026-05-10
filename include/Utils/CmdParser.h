@@ -20,7 +20,7 @@ namespace db {
         void load(const std::string& path);
 
         // 每帧计算所有命令的激活状态
-        void evaluate(const InputManager& input);
+        void evaluate(const InputManager& input, bool facingRight = true);
 
         // 查询某命令是否激活 (帧缓存)
         bool isActive(const std::string& name) const;
@@ -46,7 +46,7 @@ namespace db {
         std::vector<CommandToken> tokenize(const std::string& cmdStr) const;
 
         // 评估单条命令
-        bool evaluateCommand(const CommandDef& cmd, const InputManager& input) const;
+        bool evaluateCommand(const CommandDef& cmd, const InputManager& input, bool facingRight) const;
 
         std::map<std::string, CommandDef> m_commands;
         std::map<std::string, bool> m_active; // 每帧计算结果缓存

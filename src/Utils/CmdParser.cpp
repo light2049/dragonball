@@ -206,7 +206,7 @@ namespace db {
         return tokens;
     }
 
-    bool CmdParser::evaluateCommand(const CommandDef& cmd, const InputManager& input) const {
+    bool CmdParser::evaluateCommand(const CommandDef& cmd, const InputManager& input, bool facingRight) const {
         auto tokens = tokenize(cmd.rawCommand);
         if (tokens.empty()) return false;
 
@@ -217,6 +217,15 @@ namespace db {
             tokens[1].type == CommandToken::DIR &&
             tokens[0].value == tokens[1].value) {
             DirInput dir = strToDir(tokens[0].value);
+            // Resolve F/B as forward/back relative to facing
+            if (tokens[0].value == "F") {
+                dir = facingRight ? DirInput::F : DirInput::B;
+                return input.doubleTap(dir, cmd.time);
+            }
+            if (tokens[0].value == "B") {
+                dir = facingRight ? DirInput::B : DirInput::F;
+                return input.doubleTap(dir, cmd.time);
+            }
             if (dir != DirInput::NONE) {
                 return input.doubleTap(dir, cmd.time);
             }
@@ -358,7 +367,7 @@ namespace db {
         return false;
     }
 
-    void CmdParser::evaluate(const InputManager& input) {
+    void CmdParser::evaluate(const InputManager& input, bool facingRight) {
         // 递减所有缓冲计数
         for (auto& [name, frames] : m_buffer) {
             if (frames > 0) frames--;
@@ -366,7 +375,7 @@ namespace db {
 
         m_active.clear();
         for (const auto& [name, def] : m_commands) {
-            bool triggered = evaluateCommand(def, input);
+            bool triggered = evaluateCommand(def, input, facingRight);
             if (triggered) {
                 m_buffer[name] = def.time;  // 触发后缓冲 time 帧
             }
