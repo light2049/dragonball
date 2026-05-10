@@ -106,6 +106,7 @@ namespace db {
         // 获取当前脚底 Y 坐标 (基于轴位置和当前帧 offset.y)
         float getFeetY() const;
         sf::Vector2f getOpponentPos() const { return m_opponentPos; }
+        sf::Vector2f getPrePhysicsPos() const { return m_prePhysicsPos; }
         void setRoundState(int s) { m_roundState = s; }
         int getRoundState() const { return m_roundState; }
         void setRoundNo(int n) { m_roundNo = n; }
@@ -375,6 +376,7 @@ namespace db {
         int m_roundNo = 1;
         sf::Vector2f m_opponentPos;  // 对手位置(用于 CNS 表达式)
         mutable std::vector<HitDef> m_lastAttackHitDefs; // 保留上帧攻击的 HitDefs
+        sf::Vector2f m_prePhysicsPos; // 物理移动前的位置 (用于攻击框检测)
 
         // ✅ 记录帧开始时的状态号 (供 Helper 的 parent,stateno 使用)
         int m_frameStartState = 0;

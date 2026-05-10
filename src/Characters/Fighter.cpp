@@ -188,7 +188,7 @@ namespace db {
         //}
         m_previousStateNo = m_currentStateNo;
         m_currentStateNo = stateNo;
-        m_stateTimer = -0.008f;  // 约 -0.5/60, 使第一帧 getStateTime()=0
+        m_stateTimer = -0.008f;
         m_hasHitCurrentAttack = false;
 
         if (m_showAnimDebug) {
@@ -299,6 +299,9 @@ namespace db {
         // ==========================================
         // 1. 物理更新 (基于 statetype)
         // ==========================================
+        // 保存物理移动前的位置 (用于攻击框检测)
+        m_prePhysicsPos = m_position;
+
         float gravity = 0.f;
         float friction = 1.f;
         bool applyGroundCollision = true;

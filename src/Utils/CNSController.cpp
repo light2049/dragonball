@@ -287,12 +287,18 @@ namespace db {
             }
 
             case CondType::MOVECONTACT: {
-                result = fighter.hasMoveContact();
+                bool mc = fighter.hasMoveContact();
+                if (op == CondOp::EQ) result = (mc == (rhsInt != 0));
+                else if (op == CondOp::NEQ) result = (mc != (rhsInt != 0));
+                else result = mc;
                 break;
             }
 
             case CondType::MOVEHIT: {
-                result = fighter.hasMoveHit();
+                bool mh = fighter.hasMoveHit();
+                if (op == CondOp::EQ) result = (mh == (rhsInt != 0));
+                else if (op == CondOp::NEQ) result = (mh != (rhsInt != 0));
+                else result = mh;
                 break;
             }
 

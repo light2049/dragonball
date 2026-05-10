@@ -312,6 +312,7 @@ namespace db {
                 he.id = ph.id;
                 he.animPlayer.play(*anim);
                 he.animPlayer.setFacingRight(ph.facingRight);
+                he.facingRight = ph.facingRight;
                 he.position = ph.position;
                 he.velocity = ph.velocity;
                 he.damage = ph.damage;
@@ -324,6 +325,7 @@ namespace db {
                     const auto* sd = he.stateRegistry->getStateDef(he.stateNo);
                     if (sd) he.sprpriority = sd->sprpriority;
                 }
+                he.stateTime = -0.008f;
                 m_helpers.push_back(std::move(he));
             }
         }
@@ -343,6 +345,7 @@ namespace db {
                 he.id = ph.id;
                 he.animPlayer.play(*anim);
                 he.animPlayer.setFacingRight(ph.facingRight);
+                he.facingRight = ph.facingRight;
                 he.position = ph.position;
                 he.velocity = ph.velocity;
                 he.damage = ph.damage;
@@ -351,6 +354,7 @@ namespace db {
                 he.stateRegistry = &m_dummy->getStateRegistry();
                 he.parent = m_dummy.get();
                 he.parentStateno = ph.parentStateno;
+                he.stateTime = -0.008f;
                 m_helpers.push_back(std::move(he));
             }
         }
@@ -394,6 +398,14 @@ namespace db {
             if (const auto* stateDef = h.stateRegistry ? h.stateRegistry->getStateDef(h.stateNo) : nullptr) {
                 int ticks = static_cast<int>(h.stateTime * 60.f);
                 for (const auto& ctrl : stateDef->controllers) {
+                    // VELSET: bypass parent TIME check, use helper own timer
+                    if (ctrl->type == ControllerType::VELSET) {
+                        const auto* vc = dynamic_cast<const VelSetController*>(ctrl.get());
+                        if (vc && vc->hasX && h.stateTime < 0.02f) {
+                            float dir = h.facingRight ? 1.f : -1.f;
+                            h.velocity.x = dir * vc->valueX;
+                        }
+                    }
                     // 用父 Fighter 检查 trigger (Helper 自身没有 Fighter 状态)
                     if (!ctrl->checkTriggers(h.parent ? *h.parent : *(m_player.get()), nullptr, ticks)) continue;
 
@@ -481,11 +493,24 @@ namespace db {
                                             sf::FloatRect hb = {{0, 0}, {0, 0}};
                                             const auto& frame = h.animPlayer.getCurrentFrame();
                                             if (!frame.clsn1.empty()) {
-                                                const auto& clsn = frame.clsn1[0];
+                                                // 计算所有 clsn1 的包围盒
+                                                bool first = true;
+                                                float minX = 0, maxX = 0, minY = 0, maxY = 0;
                                                 float dir = h.facingRight ? 1.f : -1.f;
-                                                sf::Vector2f p1 = {h.position.x + clsn.topLeft.x * dir, h.position.y + clsn.topLeft.y};
-                                                sf::Vector2f p2 = {h.position.x + clsn.bottomRight.x * dir, h.position.y + clsn.bottomRight.y};
-                                                hb = {{std::min(p1.x, p2.x), std::min(p1.y, p2.y)}, {std::abs(p2.x - p1.x), std::abs(p2.y - p1.y)}};
+                                                for (const auto& clsn : frame.clsn1) {
+                                                    sf::Vector2f p1 = {h.position.x + clsn.topLeft.x * dir, h.position.y + clsn.topLeft.y};
+                                                    sf::Vector2f p2 = {h.position.x + clsn.bottomRight.x * dir, h.position.y + clsn.bottomRight.y};
+                                                    float rx1 = std::min(p1.x, p2.x), ry1 = std::min(p1.y, p2.y);
+                                                    float rx2 = std::max(p1.x, p2.x), ry2 = std::max(p1.y, p2.y);
+                                                    if (first) {
+                                                        minX = rx1; minY = ry1; maxX = rx2; maxY = ry2;
+                                                        first = false;
+                                                    } else {
+                                                        minX = std::min(minX, rx1); minY = std::min(minY, ry1);
+                                                        maxX = std::max(maxX, rx2); maxY = std::max(maxY, ry2);
+                                                    }
+                                                }
+                                                hb = {{minX, minY}, {maxX - minX, maxY - minY}};
                                             } else {
                                                 hb = {{h.position.x - 16.f, h.position.y - 16.f}, {32.f, 32.f}};
                                             }
@@ -525,6 +550,10 @@ namespace db {
                                                     });
                                                 } else {
                                                     spawnSpark(hd.sparkno > 0 ? hd.sparkno : 1200, h.position);
+                                                }
+                                                if (h.parent) {
+                                                    h.parent->setMoveContact(true);
+                                                    h.parent->setMoveHit(true);
                                                 }
                                                 // 应用防御方暂停帧 (pausetime 第二值)
                                                 int defenderPause = hd.guardPausetime;
@@ -622,6 +651,13 @@ namespace db {
 
         sf::FloatRect hitBox = m_player->getActiveHitbox();
         sf::FloatRect hurtBox = m_dummy->getActiveHurtbox();
+
+        // 将攻击框偏移到物理移动前的位置 (防止 VelSet 冲过头导致判定落空)
+        {
+            sf::Vector2f delta = m_player->getPrePhysicsPos() - m_player->getPosition();
+            hitBox.position.x += delta.x;
+            hitBox.position.y += delta.y;
+        }
 
         if (hitBox.size.x <= 0 || hitBox.size.y <= 0) {
             static int lastNoHitbox = -1;
@@ -759,7 +795,7 @@ namespace db {
 
             float overlap = (box1.size.x + box2.size.x) / 2 - std::abs(center2 - center1);
             if (overlap > 0) {
-                float pushAmount = overlap / 2.0f + 1.0f;
+                float pushAmount = overlap + 1.0f;
 
                 if (center1 < center2) {
                     m_player->addPositionX(-pushAmount);
