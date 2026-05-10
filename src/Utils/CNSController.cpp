@@ -1266,6 +1266,15 @@ namespace db {
         float addY = valueY;
         if (!valueXStr.empty()) addX = static_cast<float>(evaluateCNSExpression(valueXStr, fighter));
         if (!valueYStr.empty()) addY = static_cast<float>(evaluateCNSExpression(valueYStr, fighter));
+        if (fighter.getAnimDebug()) {
+            sf::Vector2f oppPos = fighter.getOpponentPos();
+            std::cout << "[PosAdd] x=" << addX << " y=" << addY
+                      << " myPos=(" << fighter.getPosition().x << "," << fighter.getPosition().y << ")"
+                      << " oppPos=(" << oppPos.x << "," << oppPos.y << ")"
+                      << " p2dist=(" << (oppPos.x - fighter.getPosition().x) << "," << (oppPos.y - fighter.getPosition().y) << ")"
+                      << " expr=\"" << valueXStr << "\""
+                      << std::endl;
+        }
         fighter.addPositionX(addX);
         fighter.addPositionY(addY);
     }
@@ -1339,7 +1348,9 @@ namespace db {
         type = ControllerType::TURN;
     }
     void TurnController::execute(Fighter& fighter, InputManager* inputMgr, float dt) const {
-        fighter.setFacingRight(!fighter.isFacingRight());
+        // M.U.G.E.N: Turn 是"面向对手"而不是"翻转方向"
+        sf::Vector2f oppPos = fighter.getOpponentPos();
+        fighter.setFacingRight(oppPos.x > fighter.getPosition().x);
     }
 
     // --- SelfState ---
@@ -1585,6 +1596,7 @@ namespace db {
     // ==========================================
     SuperPauseController::SuperPauseController() {
         type = ControllerType::SUPERPAUSE;
+        persistent = 0;  // 每局只触发一次 (防止 AnimElem=1 暂停结束后重复触发)
     }
     void SuperPauseController::parse(const std::string& key, const std::string& value) {
         std::string lowerKey = key;
@@ -1602,9 +1614,11 @@ namespace db {
         }
     }
     void SuperPauseController::execute(Fighter& fighter, InputManager* inputMgr, float dt) const {
-        // SuperPause 效果由 Game 层处理，这里标记给 Game
-        // 通过 Fighter 上的方法设置 SuperPause
-        fighter.setSuperPause(m_time, m_darken != 0);
+        // SuperPause 效果由 Game 层处理
+        // 防止重复触发 (AnimElem=1 在动画冻结时永远为 true)
+        if (!fighter.isInSuperPause()) {
+            fighter.setSuperPause(m_time, m_darken != 0);
+        }
     }
 
     // ==========================================

@@ -93,13 +93,10 @@ namespace db {
         //    if (f) { fprintf(f, "%s", msg.c_str()); fclose(f); }
         //}
 
-        // 初始速度
+        // 初始速度 (仅当 CNS 显式指定 velset 时应用, 包括 velset=0,0)
         if (s.hasVelset) {
-            // velset=0,0: 受击状态需冻结, 攻击状态跳过以保留连段动量
-            if (s.velsetX != 0.f || s.velsetY != 0.f || s.movetype == 2) {
-                fighter.setVelocityX(s.velsetX * 60.f);
-                fighter.setVelocityY(s.velsetY * 60.f);
-            }
+            fighter.setVelocityX(s.velsetX * 60.f);
+            fighter.setVelocityY(s.velsetY * 60.f);
         } else if (s.velsetX != 0.f || s.velsetY != 0.f) {
             // 兼容旧数据: 未标记 hasVelset 但有非零值
             fighter.setVelocityX(s.velsetX * 60.f);

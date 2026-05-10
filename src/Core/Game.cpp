@@ -192,9 +192,7 @@ namespace db {
         }
         if (m_superPauseTimer > 0) {
             m_superPauseTimer--;
-            // 动画仍然更新，但物理和状态不更新
-            if (m_player) m_player->getAnimationPlayer().update(dt);
-            if (m_dummy) m_dummy->getAnimationPlayer().update(dt);
+            // 动画不更新 (MOVETIME=25, 暂停期间动画和状态都不推进)
             return;
         }
         if (m_superPauseTimer == 0) m_superPauseDarken = false;
@@ -498,8 +496,11 @@ namespace db {
                                                 // 设置 HitInfo (保留原始速度, 击飞在气功波结束后才触发)
                                                 HitInfo hitInfo;
                                                 hitInfo.damage = hd.damage;
-                                                hitInfo.groundVelocityX = hd.groundVelocityX;
-                                                hitInfo.airVelocityX = hd.airVelocityX;
+                                                {
+                                                    float hitDir = h.facingRight ? 1.f : -1.f;
+                                                    hitInfo.groundVelocityX = hd.groundVelocityX * hitDir;
+                                                    hitInfo.airVelocityX = hd.airVelocityX * hitDir;
+                                                }
                                                 hitInfo.airVelocityY = hd.airVelocityY;
                                                 hitInfo.animtype = hd.animtype;
                                                 hitInfo.groundHittime = hd.groundHittime > 0 ? hd.groundHittime : 15;
@@ -634,7 +635,20 @@ namespace db {
         if (hurtBox.size.x <= 0 || hurtBox.size.y <= 0) return;
 
         auto intersection = hitBox.findIntersection(hurtBox);
-        if (!intersection.has_value()) return;
+        if (!intersection.has_value()) {
+            static int lastMissState = -1;
+            int cs = m_player->getCurrentStateNo();
+            if (cs != lastMissState) {
+                std::cout << "[CBmiss] state=" << cs
+                          << " hitbox=(" << hitBox.position.x << "," << hitBox.position.y << " " << hitBox.size.x << "x" << hitBox.size.y << ")"
+                          << " hurtbox=(" << hurtBox.position.x << "," << hurtBox.position.y << " " << hurtBox.size.x << "x" << hurtBox.size.y << ")"
+                          << " playerPos=(" << m_player->getPosition().x << "," << m_player->getPosition().y << ")"
+                          << " facing=" << (m_player->isFacingRight()?"R":"L")
+                          << std::endl;
+                lastMissState = cs;
+            }
+            return;
+        }
 
         std::cout << "[checkCombat] HIT! state=" << m_player->getCurrentStateNo() << std::endl;
         m_player->setMoveContact(true);
@@ -663,9 +677,13 @@ namespace db {
         info.groundHittime = (hit.groundHittime > 0) ? hit.groundHittime : 15;
         info.groundSlidetime = (hit.groundSlidetime > 0) ? hit.groundSlidetime : 15;
         info.airHittime = (hit.airHittime > 0) ? hit.airHittime : 12;
-        info.groundVelocityX = hit.groundVelocityX;
-        info.airVelocityX = hit.airVelocityX;
-        info.airVelocityY = hit.airVelocityY;
+        // 速度方向按攻击方面向翻转 (负值=击退)
+        {
+            float hitDir = m_player->isFacingRight() ? 1.f : -1.f;
+            info.groundVelocityX = hit.groundVelocityX * hitDir;
+            info.airVelocityX = hit.airVelocityX * hitDir;
+            info.airVelocityY = hit.airVelocityY;
+        }
         info.airguardVelocityX = hit.airguardVelocityX;
         info.airguardVelocityY = hit.airguardVelocityY;
         info.animtype = hit.animtype.empty() ? "Light" : hit.animtype;
@@ -695,16 +713,7 @@ namespace db {
         } else {
             m_dummy->takeDamage(info.damage);
 
-            float knockback = info.groundVelocityX * 60.f;
-            if (m_player->isFacingRight()) {
-                m_dummy->setVelocityX(knockback);
-            } else {
-                m_dummy->setVelocityX(-knockback);
-            }
-
             int targetState = 5000;
-            // p2stateno 暂不使用 (自定义受击状态依赖 M.U.G.E.N 精确物理)
-            // if (info.p2stateno > 0) { targetState = info.p2stateno; } else
             {
                 std::string type = info.animtype;
                 if (type == "Light" || type == "light") targetState = 5000;
@@ -712,6 +721,9 @@ namespace db {
                 else targetState = 5002;
             }
             m_dummy->requestStateChange(targetState);
+
+            // 击退速度由受击状态的 HitVelSet 控制器负责 (M.U.G.E.N 标准)
+            // 不在 checkCombat 中设置
 
             // P1STATENO: 攻击方命中后强制跳转状态 (连段链)
             if (info.p1stateno > 0) {
@@ -734,6 +746,9 @@ namespace db {
 
     void Game::handlePushCollision() {
         if (!m_player || !m_dummy) return;
+
+        // M.U.G.E.N 规范: 推撞只对非攻击/非受击状态生效
+        if (m_player->getMoveType() != 0 || m_dummy->getMoveType() != 0) return;
 
         sf::FloatRect box1 = m_player->getPushBox();
         sf::FloatRect box2 = m_dummy->getPushBox();

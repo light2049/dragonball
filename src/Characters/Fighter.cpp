@@ -188,7 +188,7 @@ namespace db {
         //}
         m_previousStateNo = m_currentStateNo;
         m_currentStateNo = stateNo;
-        m_stateTimer = 0.0f;
+        m_stateTimer = -0.008f;  // 约 -0.5/60, 使第一帧 getStateTime()=0
         m_hasHitCurrentAttack = false;
 
         if (m_showAnimDebug) {
@@ -261,6 +261,11 @@ namespace db {
             m_hasMoveGuarded = false;
             m_isAttacking = true;
         }
+
+        // M.U.G.E.N: 进入新状态时面向对手
+        float dx = m_opponentPos.x - m_position.x;
+        if (dx > 0) m_animationPlayer.setFacingRight(true);
+        else if (dx < 0) m_animationPlayer.setFacingRight(false);
     }
 
     const std::vector<HitDef>& Fighter::getCurrentHitDefs() const {
@@ -614,30 +619,41 @@ namespace db {
         }
 
         // ==========================================
-        // 8. 每帧清除命中标志 (让 movehit 只在下帧状态执行前可见)
+        // 8. 每帧清除命中标志 (让 movehit / movecontact 只在下帧状态执行前可见)
         // ==========================================
         m_hasMoveHit = false;
+        m_hasMoveContact = false;
 
         // ==========================================
         // 9. 动画更新
         // ==========================================
         m_animationPlayer.update(dt);
 
-        // AnimDebug: 每帧输出动画状态
+        // AnimDebug: 状态变化时输出动画摘要 (非每帧)
         if (m_showAnimDebug && m_currentStateNo != 0) {
-            const auto& frame = m_animationPlayer.getCurrentFrame();
-            bool texOk = m_animationPlayer.getSpriteSize().x > 0;
+            static int lastState = -1, lastAnim = -1, lastElem = -1;
+            int curState = m_currentStateNo;
+            int curAnim = m_animationPlayer.getCurrentAnimId();
+            int curElem = m_animationPlayer.getCurrentAnimElem();
             int totalFrames = m_animationPlayer.getTotalFrames();
+            const auto& frame = m_animationPlayer.getCurrentFrame();
             bool hasClsn1 = !frame.clsn1.empty();
-            std::cout << "[AnimTrace] state=" << m_currentStateNo
-                      << " anim=" << m_animationPlayer.getCurrentAnimId()
-                      << " elem=" << m_animationPlayer.getCurrentAnimElem() << "/" << totalFrames
-                      << " tick=" << static_cast<int>(m_stateTimer * 60.f)
-                      << " vel=(" << static_cast<int>(m_velocity.x) << "," << static_cast<int>(m_velocity.y) << ")"
-                      << " hitdef=" << (hasClsn1 ? 1 : 0)
-                      << " " << (texOk ? "OK" : "MISS")
-                      << " tex=" << frame.texturePath
-                      << std::endl;
+            bool texOk = m_animationPlayer.getSpriteSize().x > 0;
+
+            // 仅在状态/动画/帧变化时输出
+            if (curState != lastState || curAnim != lastAnim || curElem != lastElem) {
+                lastState = curState; lastAnim = curAnim; lastElem = curElem;
+                int stateTicks = static_cast<int>(m_stateTimer * 60.f);
+                std::cout << "[AnimTrace] state=" << curState
+                          << " anim=" << curAnim
+                          << " elem=" << curElem << "/" << totalFrames
+                          << " tick=" << stateTicks
+                          << " vel=(" << static_cast<int>(m_velocity.x) << "," << static_cast<int>(m_velocity.y) << ")"
+                          << " hitdef=" << (hasClsn1 ? 1 : 0)
+                          << " " << (texOk ? "OK" : "MISS")
+                          << " tex=" << frame.texturePath
+                          << std::endl;
+            }
         }
 
         // 9.5 安全地面碰撞 (在 CNS PosSet 等可能修改位置后再次执行)
