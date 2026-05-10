@@ -56,6 +56,11 @@ namespace db {
 
             // ChangeState 执行后立即停止
             if (fighter.getCurrentStateNo() != currentState) break;
+            if (stateNo == -1 && ctrl->type == ControllerType::CHANGESTATE) {
+                std::cout << "[State-1] state=" << fighter.getCurrentStateNo()
+                          << " ctrl=" << fighter.hasControl()
+                          << " val=" << ctrl->value << std::endl;
+            }
         }
     }
 

@@ -380,7 +380,13 @@ namespace db {
         // ==========================================
         // 3. 执行 StateDef -1 (CMD → 状态跳转)
         // ==========================================
+        int stateBeforeMinusOne = m_currentStateNo;
         m_stateRegistry.executeState(-1, *this, &inputMgr, dt);
+        // state -1 触发了状态变更时，清除命令缓冲防止残留命令导致非预期的状态切换
+        // (例如 "BB" 触发了 105 但 "721" 的 15 帧缓冲残留导致后续帧非预期触发 721)
+        if (stateBeforeMinusOne != m_currentStateNo) {
+            m_cmdParser.resetBuffers();
+        }
         m_frameStartState = m_currentStateNo; // 在 -1 执行后重新捕获（此时已是目标状态）
 
         // ==========================================
@@ -390,11 +396,12 @@ namespace db {
         float distToOpponent = std::abs(opponentPos.x - m_position.x);
         bool inGuardRange = isInGuardDist();
 
-        // M.U.G.E.N 标准方向输入: holdfwd/holdback 是屏幕绝对方向
-        bool fwd = inputMgr.isHeld("holdfwd");
-        bool back = inputMgr.isHeld("holdback");
-        bool up = inputMgr.isHeld("holdup");
-        bool down = inputMgr.isHeld("holddown");
+        // M.U.G.E.N 标准方向输入: 屏幕绝对方向 (不经过 CmdParser, 防止 facing-relative 干扰)
+        DirInput rawDir = inputMgr.getDirection();
+        bool fwd = (rawDir == DirInput::F || rawDir == DirInput::UF || rawDir == DirInput::DF);
+        bool back = (rawDir == DirInput::B || rawDir == DirInput::UB || rawDir == DirInput::DB);
+        bool up = (rawDir == DirInput::U || rawDir == DirInput::UF || rawDir == DirInput::UB);
+        bool down = (rawDir == DirInput::D || rawDir == DirInput::DF || rawDir == DirInput::DB);
         bool charge = inputMgr.isHeld("hold_s");
 
         if (m_currentStateNo == 0 && inputActive) {
