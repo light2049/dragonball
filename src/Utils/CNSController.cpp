@@ -819,17 +819,42 @@ namespace db {
                 cond.type = CondType::BACKEDGEBODYDIST;
                 try { cond.rhsInt = std::stoi(rhs); } catch(...) { cond.rhsInt = 0; }
             }
-            else if (lhsLower == "movehit")         cond.type = CondType::MOVEHIT;
-            else if (lhsLower == "movecontact")     cond.type = CondType::MOVECONTACT;
-            else if (lhsLower == "ctrl")            cond.type = CondType::CTRL;
-            else if (lhsLower == "alive")           cond.type = CondType::ALIVE;
-            else if (lhsLower == "moveguarded")     cond.type = CondType::MOVEGUARDED;
-            else if (lhsLower == "hitover")         cond.type = CondType::HITOVER;
-            else if (lhsLower == "hitshakeover")    cond.type = CondType::HITSHAKEOVER;
-            else if (lhsLower == "canrecover")      cond.type = CondType::CANRECOVER;
-            else if (lhsLower == "inguarddist")     cond.type = CondType::INGUARDDIST;
-            else if (lhsLower == "matchover")       cond.type = CondType::MATCHOVER;
-            else if (lhsLower == "hitfall")         cond.type = CondType::HITFALL;
+            else if (lhsLower == "movehit") {
+                cond.type = CondType::MOVEHIT;
+                try { cond.rhsInt = std::stoi(rhs); } catch(...) { cond.rhsInt = 0; }
+            }
+            else if (lhsLower == "movecontact") {
+                cond.type = CondType::MOVECONTACT;
+                try { cond.rhsInt = std::stoi(rhs); } catch(...) { cond.rhsInt = 0; }
+            }
+            else if (lhsLower == "moveguarded") {
+                cond.type = CondType::MOVEGUARDED;
+                try { cond.rhsInt = std::stoi(rhs); } catch(...) { cond.rhsInt = 0; }
+            }
+            else if (lhsLower == "hitover") {
+                cond.type = CondType::HITOVER;
+                try { cond.rhsInt = std::stoi(rhs); } catch(...) { cond.rhsInt = 0; }
+            }
+            else if (lhsLower == "hitshakeover") {
+                cond.type = CondType::HITSHAKEOVER;
+                try { cond.rhsInt = std::stoi(rhs); } catch(...) { cond.rhsInt = 0; }
+            }
+            else if (lhsLower == "canrecover") {
+                cond.type = CondType::CANRECOVER;
+                try { cond.rhsInt = std::stoi(rhs); } catch(...) { cond.rhsInt = 0; }
+            }
+            else if (lhsLower == "inguarddist") {
+                cond.type = CondType::INGUARDDIST;
+                try { cond.rhsInt = std::stoi(rhs); } catch(...) { cond.rhsInt = 0; }
+            }
+            else if (lhsLower == "matchover") {
+                cond.type = CondType::MATCHOVER;
+                try { cond.rhsInt = std::stoi(rhs); } catch(...) { cond.rhsInt = 0; }
+            }
+            else if (lhsLower == "hitfall") {
+                cond.type = CondType::HITFALL;
+                try { cond.rhsInt = std::stoi(rhs); } catch(...) { cond.rhsInt = 0; }
+            }
             else if (lhsLower.find("ifelse") != std::string::npos) {
                 // ifelse 在 CNS 中作为函数参数使用，这里简化处理
                 cond.type = CondType::LITERAL_TRUE;

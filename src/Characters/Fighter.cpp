@@ -249,7 +249,9 @@ namespace db {
         //    logMsg(msg.c_str());
         //}
 
-        // 引擎级重置: 进入待机/攻击状态时清除命中标志
+        // 引擎级重置: 进入新状态时重置命中消费标志
+        m_hitConsumed = false;
+
         if (m_moveType == 0) { // I = Idle
             m_hasMoveContact = false;
             m_hasMoveHit = false;

@@ -177,6 +177,8 @@ namespace db {
 
         // 是否命中对手 (movehit / moveguarded)
         bool hasMoveHit() const { return m_hasMoveHit; }
+        bool isHitConsumed() const { return m_hitConsumed; }
+        void setHitConsumed(bool v) { m_hitConsumed = v; }
         void setMoveHit(bool hit) { m_hasMoveHit = hit; }
         bool hasMoveGuarded() const { return m_hasMoveGuarded; }
         void setMoveGuarded(bool g) { m_hasMoveGuarded = g; }
@@ -343,6 +345,7 @@ namespace db {
 
         bool m_isAttacking = false;
         bool m_hasHitCurrentAttack = false;
+        bool m_hitConsumed = false; // 当前状态是否已命中过对手 (hitonce)
         bool m_hasMoveContact = false; // ✅ 新增：记录本次攻击是否已命中/被防
         bool m_hasMoveHit = false;     // 是否实际命中 (非被防)
         bool m_hasMoveGuarded = false; // 是否被防御

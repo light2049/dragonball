@@ -629,7 +629,17 @@ namespace db {
 
     void Game::checkCombat() {
         if (!m_player || !m_dummy || m_dummy->isDead()) return;
-        if (m_player->hasMoveContact()) return;
+        if (m_player->isHitConsumed()) {
+            return;
+        }
+        if (m_player->getCurrentStateNo() == 600) {
+            auto pos = m_player->getPosition();
+            std::cout << "[CB600] consumed=" << m_player->isHitConsumed()
+                      << " mh=" << m_player->hasMoveHit()
+                      << " pos=(" << (int)pos.x << "," << (int)pos.y << ")"
+                      << " vy=" << (int)m_player->getVelocityY()
+                      << std::endl;
+        }
         const auto& hitDefs = m_player->getCurrentHitDefs();
         static int emptyCount = 0;
         if (hitDefs.empty()) {
@@ -703,6 +713,7 @@ namespace db {
         } else {
             m_player->setMoveHit(true);
         }
+        m_player->setHitConsumed(true);
 
         std::string hitMsg = "HIT! state=" + std::to_string(m_player->getCurrentStateNo()) + "\n";
         logMsg(hitMsg.c_str());
