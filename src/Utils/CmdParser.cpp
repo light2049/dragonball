@@ -108,10 +108,6 @@ namespace db {
             std::string lowerKey = toLower(key);
 
             if (lowerKey == "name") {
-                // 去掉尾部分号注释
-                size_t semicolon = value.find(';');
-                if (semicolon != std::string::npos) value = value.substr(0, semicolon);
-                value = trim(value);
                 // 去掉引号
                 if (value.size() >= 2 && value[0] == '"' && value.back() == '"') {
                     value = value.substr(1, value.size() - 2);
@@ -221,24 +217,17 @@ namespace db {
             tokens[1].type == CommandToken::DIR &&
             tokens[0].value == tokens[1].value) {
             DirInput dir = strToDir(tokens[0].value);
-            // F/B 是相对方向: F=面朝方向(向前), B=面朝反方向(向后)
-            // 需要翻译成物理方向再检查双击
+            // Resolve F/B as forward/back relative to facing
             if (tokens[0].value == "F") {
                 dir = facingRight ? DirInput::F : DirInput::B;
-                bool result = input.doubleTap(dir, cmd.time);
-                if (result) std::cout << "[Cmd] " << cmd.name << " triggered dir=" << (int)dir << " facing=" << (facingRight?"R":"L") << std::endl;
-                return result;
+                return input.doubleTap(dir, cmd.time);
             }
             if (tokens[0].value == "B") {
                 dir = facingRight ? DirInput::B : DirInput::F;
-                bool result = input.doubleTap(dir, cmd.time);
-                if (result) std::cout << "[Cmd] " << cmd.name << " triggered dir=" << (int)dir << " facing=" << (facingRight?"R":"L") << std::endl;
-                return result;
+                return input.doubleTap(dir, cmd.time);
             }
             if (dir != DirInput::NONE) {
-                bool result = input.doubleTap(dir, cmd.time);
-                if (result) std::cout << "[Cmd] " << cmd.name << " triggered dir=" << (int)dir << " facing=" << (facingRight?"R":"L") << std::endl;
-                return result;
+                return input.doubleTap(dir, cmd.time);
             }
         }
 
@@ -261,16 +250,9 @@ namespace db {
                     return input.isDirHeld(strToDir(t.value));
                 case CommandToken::HOLD_DIR: {
                     DirInput dir = strToDir(t.value);
-                    // 4-way + facing-relative: F = 面朝方向(向前)
-                    // 面向右时 F=F/UF/DF, 面向左时 F=B/UB/DB
-                    if (t.value == "F") {
-                        if (facingRight) return input.isDirHeld(DirInput::F) || input.isDirHeld(DirInput::UF) || input.isDirHeld(DirInput::DF);
-                        else return input.isDirHeld(DirInput::B) || input.isDirHeld(DirInput::UB) || input.isDirHeld(DirInput::DB);
-                    }
-                    if (t.value == "B") {
-                        if (facingRight) return input.isDirHeld(DirInput::B) || input.isDirHeld(DirInput::UB) || input.isDirHeld(DirInput::DB);
-                        else return input.isDirHeld(DirInput::F) || input.isDirHeld(DirInput::UF) || input.isDirHeld(DirInput::DF);
-                    }
+                    // 4-way: F = F|UF|DF, etc.
+                    if (t.value == "F") return input.isDirHeld(DirInput::F) || input.isDirHeld(DirInput::UF) || input.isDirHeld(DirInput::DF);
+                    if (t.value == "B") return input.isDirHeld(DirInput::B) || input.isDirHeld(DirInput::UB) || input.isDirHeld(DirInput::DB);
                     if (t.value == "D") return input.isDirHeld(DirInput::D) || input.isDirHeld(DirInput::DF) || input.isDirHeld(DirInput::DB);
                     if (t.value == "U") return input.isDirHeld(DirInput::U) || input.isDirHeld(DirInput::UF) || input.isDirHeld(DirInput::UB);
                     return input.isDirHeld(dir);
@@ -309,18 +291,13 @@ namespace db {
             const auto& t0 = tokens[0];
             switch (t0.type) {
                 case CommandToken::DIR: {
-                    // 检查当前帧 + 历史帧, 4-way + facing-relative
+                    // 检查当前帧 + 历史帧 (M.U.G.E.N 标准: 方向在 command.time 帧内出现过即匹配)
+                    // 同时使用 4-way 匹配 (F 匹配 F|UF|DF)
                     DirInput targetDir = strToDir(t0.value);
                     auto dirMatch = [&](DirInput d) -> bool {
                         if (d == targetDir) return true;
-                        if (t0.value == "F") {
-                            if (facingRight) return d == DirInput::UF || d == DirInput::DF;
-                            else return d == DirInput::UB || d == DirInput::DB;
-                        }
-                        if (t0.value == "B") {
-                            if (facingRight) return d == DirInput::UB || d == DirInput::DB;
-                            else return d == DirInput::UF || d == DirInput::DF;
-                        }
+                        if (t0.value == "F") return d == DirInput::UF || d == DirInput::DF;
+                        if (t0.value == "B") return d == DirInput::UB || d == DirInput::DB;
                         if (t0.value == "D") return d == DirInput::DF || d == DirInput::DB;
                         if (t0.value == "U") return d == DirInput::UF || d == DirInput::UB;
                         return false;
@@ -404,11 +381,6 @@ namespace db {
             }
             m_active[name] = (m_buffer[name] > 0);
         }
-    }
-
-    void CmdParser::resetBuffers() {
-        m_buffer.clear();
-        m_active.clear();
     }
 
     bool CmdParser::isActive(const std::string& name) const {

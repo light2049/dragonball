@@ -25,9 +25,6 @@ namespace db {
         // 查询某命令是否激活 (帧缓存)
         bool isActive(const std::string& name) const;
 
-        // 重置所有命令的缓冲 (当状态变更时调用，防止缓冲残留)
-        void resetBuffers();
-
         // 获取解析出的命令定义
         const std::map<std::string, CommandDef>& getCommands() const { return m_commands; }
 
