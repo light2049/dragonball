@@ -8,6 +8,7 @@
 #include "Utils/AirParser.h"
 #include "Utils/CnsParser.h"  // ✅ 引入数据结构
 #include "Utils/CmdParser.h"   // ✅ 引入 CMD 解析器
+#include "Utils/SFFDatabase.h"
 
 namespace db {
 
@@ -336,6 +337,7 @@ namespace db {
         std::map<int, Animation> m_animations;
         StateRegistry m_stateRegistry;
         CmdParser m_cmdParser;  // CMD 指令解析器
+        SFFDatabase m_sffDb;    // 当前角色的精灵轴数据库
 
         int m_maxLife = 1000;
         int m_currentLife = 1000;

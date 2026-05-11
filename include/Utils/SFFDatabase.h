@@ -14,7 +14,7 @@ namespace db {
 
     class SFFDatabase {
     public:
-        static SFFDatabase& getInstance();
+        SFFDatabase() = default;
 
         bool load(const std::string& filePath);
 
@@ -22,8 +22,6 @@ namespace db {
         const SpriteAxisData* lookup(int group, int image) const;
 
     private:
-        SFFDatabase() = default;
-
         // key = (group << 16) | image
         std::unordered_map<int, SpriteAxisData> m_data;
     };

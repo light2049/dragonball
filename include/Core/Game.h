@@ -80,14 +80,29 @@ namespace db {
         int m_superPauseTimer = 0;
         bool m_superPauseDarken = false;
 
+        // 角色定义
+        struct CharacterDef {
+            std::string dirName;
+            std::string displayName;
+        };
+        std::vector<CharacterDef> discoverCharacters();
+        void initFight(int p1Choice, int p2Choice);
+
         // 回合系统
-        enum class GameState { INTRO, FIGHT, KO };
-        GameState m_gameState = GameState::FIGHT;
+        enum class GameState { SELECT, INTRO, FIGHT, KO };
+        GameState m_gameState = GameState::SELECT;
         int m_roundNumber = 1;
         int m_p1RoundsWon = 0;
         int m_p2RoundsWon = 0;
         float m_koTimer = 0.f;
         float m_roundTimer = 0.f;
+
+        // 选人界面
+        std::vector<CharacterDef> m_availableChars;
+        int m_p1Choice = 0;
+        int m_p2Choice = 0;
+        int m_selectPhase = 0;  // 0=P1选, 1=P2选, 2=准备开始
+        sf::View m_uiView{sf::FloatRect({0, 0}, {1920, 1080})};
 
         std::vector<Spark> m_sparks;
         std::vector<HelperEntity> m_helpers;

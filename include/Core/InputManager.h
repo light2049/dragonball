@@ -53,6 +53,13 @@ namespace db {
         bool justPressed(char btn) const;
         bool justReleased(char btn) const;
 
+        // 通用按键边缘检测 (基于 KeyPressed 事件)
+        bool isKeyJustPressed(sf::Keyboard::Key key) const {
+            int k = static_cast<int>(key);
+            if (k >= 0 && k < 128) return m_justPressedLatch[k];
+            return false;
+        }
+
         // M.U.G.E.N 按钮检测 (当前帧状态)
         bool buttonX() const;  // 轻拳
         bool buttonY() const;  // 中拳

@@ -62,10 +62,10 @@ namespace {
 
 std::map<int, Animation> AirParser::parse(const std::string& filePath,
                                           const std::string& basePath,
-                                          const std::string& prefix) {
+                                          const std::string& prefix,
+                                          SFFDatabase& sffDb) {
     // 加载 SFF 轴数据库 (懒加载，仅首次成功加载后不再重复)
     // 数据库文件在角色根目录 (basePath 是 Sprites/ 子目录，需要回退一层)
-    auto& sffDb = SFFDatabase::getInstance();
     std::string dbPath = basePath + "../sprite_database_" + prefix + ".txt";
     if (!sffDb.lookup(0, 1)) {
         sffDb.load(dbPath);

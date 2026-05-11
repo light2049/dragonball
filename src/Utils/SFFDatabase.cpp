@@ -6,11 +6,6 @@
 
 namespace db {
 
-    SFFDatabase& SFFDatabase::getInstance() {
-        static SFFDatabase instance;
-        return instance;
-    }
-
     bool SFFDatabase::load(const std::string& filePath) {
         std::ifstream file(filePath);
         if (!file.is_open()) {
@@ -26,40 +21,40 @@ namespace db {
             // 跳过空行
             if (line.empty()) continue;
 
-            std::istringstream iss(line);
-            std::string token;
+            try {
+                std::istringstream iss(line);
+                std::string token;
 
-            // Group
-            if (!std::getline(iss, token, '\t')) continue;
-            int group = std::stoi(token);
+                // Group
+                if (!std::getline(iss, token, '\t')) continue;
+                int group = std::stoi(token);
 
-            // Image
-            if (!std::getline(iss, token, '\t')) continue;
-            int image = std::stoi(token);
+                // Image
+                if (!std::getline(iss, token, '\t')) continue;
+                int image = std::stoi(token);
 
-            // Width
-            if (!std::getline(iss, token, '\t')) continue;
-            int width = std::stoi(token);
+                // Width
+                if (!std::getline(iss, token, '\t')) continue;
+                int width = std::stoi(token);
 
-            // Height
-            if (!std::getline(iss, token, '\t')) continue;
-            int height = std::stoi(token);
+                // Height
+                if (!std::getline(iss, token, '\t')) continue;
+                int height = std::stoi(token);
 
-            // AxisX
-            if (!std::getline(iss, token, '\t')) continue;
-            int axisX = std::stoi(token);
+                // AxisX
+                if (!std::getline(iss, token, '\t')) continue;
+                int axisX = std::stoi(token);
 
-            // AxisY
-            if (!std::getline(iss, token, '\t')) continue;
-            int axisY = std::stoi(token);
+                // AxisY
+                if (!std::getline(iss, token, '\t')) continue;
+                int axisY = std::stoi(token);
 
-            int key = (group << 16) | (image & 0xFFFF);
-            m_data[key] = {width, height, axisX, axisY};
-            loadedCount++;
-            // 验证关键帧
-            if (group == 0 && image == 6) {
-                std::cout << "[SFFDatabase] LOADED (0,6): axis=(" << axisX << "," << axisY
-                          << ") size=" << width << "x" << height << " key=" << key << std::endl;
+                int key = (group << 16) | (image & 0xFFFF);
+                m_data[key] = {width, height, axisX, axisY};
+                loadedCount++;
+
+            } catch (...) {
+                // 行解析失败，跳过
             }
         }
 

@@ -64,7 +64,8 @@ namespace db {
     public:
         static std::map<int, Animation> parse(const std::string& filePath,
                                               const std::string& basePath,
-                                              const std::string& prefix);
+                                              const std::string& prefix,
+                                              class SFFDatabase& sffDb);
     };
 
 } // namespace db

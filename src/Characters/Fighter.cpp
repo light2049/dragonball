@@ -33,7 +33,7 @@ namespace db {
     }
 
     void Fighter::loadAnimations(const std::string& airPath, const std::string& basePath, const std::string& prefix) {
-        m_animations = AirParser::parse(airPath, basePath, prefix);
+        m_animations = AirParser::parse(airPath, basePath, prefix, m_sffDb);
         std::cout << "[Fighter] Loaded " << m_animations.size() << " animations." << std::endl;
         switchAnimation(0);
     }

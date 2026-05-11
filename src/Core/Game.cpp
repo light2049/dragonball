@@ -4,6 +4,8 @@
 #include <algorithm>
 #include <cstdlib>
 #include <cstdio>
+#include <filesystem>
+#include <fstream>
 
 namespace db {
 
@@ -14,7 +16,6 @@ namespace db {
             fprintf(f, "%s", msg);
             fclose(f);
         }
-        // Also try writing to a simple path
         FILE* f2 = fopen("C:\\game_log.txt", "a");
         if (f2) {
             fprintf(f2, "%s", msg);
@@ -26,54 +27,7 @@ namespace db {
         window_.setVerticalSyncEnabled(true);
         window_.setFramerateLimit(60);
         try {
-            const std::string CHAR_NAME = "Vegito_Blue_Kaioken";
-            const std::string BASE_PATH   = "Data/Characters/" + CHAR_NAME + "/";
-            const std::string SPRITE_DIR  = BASE_PATH + "Sprites/";
-            const std::string AIR_FILE    = BASE_PATH + CHAR_NAME + ".air";
-            const std::string CNS_FILE    = BASE_PATH + CHAR_NAME + ".cns";
-            const std::string CMS_FILE    = BASE_PATH + "common1.cns";
-            const std::string CMD_FILE    = BASE_PATH + CHAR_NAME + ".cmd";
-
-            logMsg("Game constructor start\n");
-
-            m_player = std::make_unique<Fighter>();
-            m_player->loadAnimations(AIR_FILE, SPRITE_DIR, CHAR_NAME);
-            m_player->loadStats(CNS_FILE);
-            m_player->loadCommonStates(CMS_FILE);
-            m_player->loadCommands(CMD_FILE);
-            // 初始化完成后正式进入状态 0，确保状态属性被正确应用
-            m_player->requestStateChange(0);
-            // 调整到轴参考系: 轴位置 = 地面 - 帧 offset.y
-            {
-                float offsetY = static_cast<float>(m_player->getAnimationPlayer().getCurrentFrame().offset.y);
-                m_player->setPosition(200.0f, 480.0f - offsetY);
-                m_player->setGroundLevel(480.0f - offsetY);
-                logMsg("Player loaded\n");
-            }
-
-            m_dummy = std::make_unique<Fighter>();
-            m_dummy->loadAnimations(AIR_FILE, SPRITE_DIR, CHAR_NAME);
-            m_dummy->loadStats(CNS_FILE);
-            m_dummy->loadCommonStates(CMS_FILE);
-            m_dummy->loadCommands(CMD_FILE);
-            m_dummy->requestStateChange(0);
-            // 调整到轴参考系: 轴位置 = 地面 - 帧 offset.y
-            {
-                float offsetY = static_cast<float>(m_dummy->getAnimationPlayer().getCurrentFrame().offset.y);
-                m_dummy->setPosition(600.0f, 480.0f - offsetY);
-                m_dummy->setGroundLevel(480.0f - offsetY);
-                logMsg("Dummy loaded\n");
-            }
-
-            m_hudP1 = std::make_unique<HUD>();
-            m_hudP1->setPosition(20.0f, 20.0f);
-            m_hudP1->update(m_player->getCurrentLife(), m_player->getMaxLife());
-            m_hudP1->updatePower(m_player->getPower(), m_player->getMaxPower());
-
-            m_hudP2 = std::make_unique<HUD>();
-            m_hudP2->setPosition(480.0f, 20.0f);
-            m_hudP2->update(m_dummy->getCurrentLife(), m_dummy->getMaxLife());
-            m_hudP2->updatePower(m_dummy->getPower(), m_dummy->getMaxPower());
+            m_availableChars = discoverCharacters();
 
             // 加载调试字体
             if (m_debugFont.openFromFile("C:\\Windows\\Fonts\\arial.ttf")) {
@@ -84,7 +38,7 @@ namespace db {
                 m_debugReady = true;
             }
 
-            logMsg("Game ready\n");
+            logMsg("Game ready (SELECT screen)\n");
 
         } catch (const std::exception& e) {
             std::string err = "Error: ";
@@ -92,16 +46,6 @@ namespace db {
             err += "\n";
             logMsg(err.c_str());
         }
-        // 开场: 执行 5900 (初始化), 由 CNS 决定 190 (intro) 或 0 (战斗)
-        if (m_player && m_dummy) {
-            m_player->setRoundState(1);
-            m_dummy->setRoundState(1);
-            m_player->setRoundNo(1);
-            m_dummy->setRoundNo(1);
-            m_player->requestStateChange(5900);
-            m_dummy->requestStateChange(5900);
-        }
-        m_gameState = GameState::INTRO;
     }
 
     Game::~Game() { window_.close(); }
@@ -117,6 +61,89 @@ namespace db {
         spark.animPlayer.play(*anim);
         spark.position = pos;
         m_sparks.push_back(std::move(spark));
+    }
+
+    std::vector<Game::CharacterDef> Game::discoverCharacters() {
+        std::vector<CharacterDef> chars;
+        std::string charsDir = "Data/Characters/";
+        try {
+            for (const auto& entry : std::filesystem::directory_iterator(charsDir)) {
+                if (!entry.is_directory()) continue;
+                std::string dirName = entry.path().filename().string();
+                std::string defPath = charsDir + dirName + "/" + dirName + ".def";
+
+                std::string displayName = dirName;
+                std::ifstream defFile(defPath);
+                if (defFile.is_open()) {
+                    std::string line;
+                    while (std::getline(defFile, line)) {
+                        // .def 中使用 displayname = "Name"
+                        auto pos = line.find("displayname");
+                        if (pos == std::string::npos) pos = line.find("displayname");
+                        if (pos != std::string::npos) {
+                            auto eq = line.find('=');
+                            if (eq != std::string::npos) {
+                                displayName = line.substr(eq + 1);
+                                // 去掉首尾空格和引号
+                                displayName.erase(0, displayName.find_first_not_of(" \t\""));
+                                displayName.erase(displayName.find_last_not_of(" \t\"") + 1);
+                            }
+                            break;
+                        }
+                    }
+                }
+                chars.push_back({dirName, displayName});
+                std::cout << "[Select] Found character: " << displayName << " (" << dirName << ")" << std::endl;
+            }
+        } catch (const std::exception& e) {
+            std::cerr << "[Select] Error scanning characters: " << e.what() << std::endl;
+        }
+        if (chars.empty()) {
+            std::cerr << "[Select] No characters found in " << charsDir << std::endl;
+        }
+        return chars;
+    }
+
+    void Game::initFight(int p1Choice, int p2Choice) {
+        auto loadChar = [&](const std::string& name, std::unique_ptr<Fighter>& fighter, float xPos) {
+            fighter = std::make_unique<Fighter>();
+            std::string base = "Data/Characters/" + name + "/";
+            std::string prefix = name;
+            fighter->loadAnimations(base + prefix + ".air", base + "Sprites/", prefix);
+            fighter->loadStats(base + prefix + ".cns");
+            fighter->loadCommonStates(base + "common1.cns");
+            fighter->loadCommands(base + prefix + ".cmd");
+            fighter->requestStateChange(0);
+            float offsetY = static_cast<float>(fighter->getAnimationPlayer().getCurrentFrame().offset.y);
+            fighter->setPosition(xPos, 480.0f - offsetY);
+            fighter->setGroundLevel(480.0f - offsetY);
+        };
+
+        loadChar(m_availableChars[p1Choice].dirName, m_player, 200.f);
+        loadChar(m_availableChars[p2Choice].dirName, m_dummy, 600.f);
+
+        m_hudP1 = std::make_unique<HUD>();
+        m_hudP1->setPosition(20.0f, 20.0f);
+        m_hudP1->update(m_player->getCurrentLife(), m_player->getMaxLife());
+        m_hudP1->updatePower(m_player->getPower(), m_player->getMaxPower());
+
+        m_hudP2 = std::make_unique<HUD>();
+        m_hudP2->setPosition(1600.0f, 20.0f);
+        m_hudP2->update(m_dummy->getCurrentLife(), m_dummy->getMaxLife());
+        m_hudP2->updatePower(m_dummy->getPower(), m_dummy->getMaxPower());
+
+        m_player->setRoundState(1);
+        m_dummy->setRoundState(1);
+        m_player->setRoundNo(1);
+        m_dummy->setRoundNo(1);
+        m_player->requestStateChange(5900);
+        m_dummy->requestStateChange(5900);
+
+        m_gameState = GameState::INTRO;
+        m_selectPhase = 0;
+        m_roundTimer = 0.f;
+        std::cout << "[Select] Fight! " << m_availableChars[p1Choice].displayName
+                  << " vs " << m_availableChars[p2Choice].displayName << std::endl;
     }
 
     void Game::run() {
@@ -157,6 +184,55 @@ namespace db {
     }
 
     void Game::update(float dt) {
+        // 0. 选人界面
+        if (m_gameState == GameState::SELECT) {
+            int cols = 2;
+            int rows = (static_cast<int>(m_availableChars.size()) + cols - 1) / cols;
+
+            // P1 控制 (WASD + J 确认)
+            if (m_selectPhase == 0) {
+                if (inputManager_.isKeyJustPressed(sf::Keyboard::Key::W)) {
+                    m_p1Choice = (m_p1Choice - cols + static_cast<int>(m_availableChars.size())) % m_availableChars.size();
+                }
+                if (inputManager_.isKeyJustPressed(sf::Keyboard::Key::S)) {
+                    m_p1Choice = (m_p1Choice + cols) % m_availableChars.size();
+                }
+                if (inputManager_.isKeyJustPressed(sf::Keyboard::Key::A)) {
+                    m_p1Choice = (m_p1Choice - 1 + static_cast<int>(m_availableChars.size())) % m_availableChars.size();
+                }
+                if (inputManager_.isKeyJustPressed(sf::Keyboard::Key::D)) {
+                    m_p1Choice = (m_p1Choice + 1) % m_availableChars.size();
+                }
+                if (inputManager_.isKeyJustPressed(sf::Keyboard::Key::J)) {
+                    m_selectPhase = 1;
+                    m_p2Choice = (m_p1Choice + 1) % m_availableChars.size();
+                    std::cout << "[Select] P1 chose " << m_availableChars[m_p1Choice].displayName << std::endl;
+                }
+            }
+
+            // P2 控制 (IJKL + Enter 确认)
+            if (m_selectPhase >= 1) {
+                if (inputManager_.isKeyJustPressed(sf::Keyboard::Key::I)) {
+                    m_p2Choice = (m_p2Choice - cols + static_cast<int>(m_availableChars.size())) % m_availableChars.size();
+                }
+                if (inputManager_.isKeyJustPressed(sf::Keyboard::Key::K)) {
+                    m_p2Choice = (m_p2Choice + cols) % m_availableChars.size();
+                }
+                if (inputManager_.isKeyJustPressed(sf::Keyboard::Key::J)) {
+                    m_p2Choice = (m_p2Choice - 1 + static_cast<int>(m_availableChars.size())) % m_availableChars.size();
+                }
+                if (inputManager_.isKeyJustPressed(sf::Keyboard::Key::L)) {
+                    m_p2Choice = (m_p2Choice + 1) % m_availableChars.size();
+                }
+                if (inputManager_.isKeyJustPressed(sf::Keyboard::Key::Enter)) {
+                    m_selectPhase = 2;
+                    std::cout << "[Select] P2 chose " << m_availableChars[m_p2Choice].displayName << std::endl;
+                    initFight(m_p1Choice, m_p2Choice);
+                }
+            }
+            return;
+        }
+
         // 0. 开场动画 (检测进入循环后切到 191 → 0 → FIGHT)
         if (m_gameState == GameState::INTRO) {
             // 由 CNS State 190 自己控制: ChangeAnim(RoundState=1 时不冻结) → AnimTime=0 → ChangeState 0
@@ -281,6 +357,17 @@ namespace db {
                 if (p2KO) m_p1RoundsWon++;
                 if (m_p1RoundsWon >= 2 || m_p2RoundsWon >= 2) {
                     std::cout << "[MATCH] Player " << (m_p1RoundsWon >= 2 ? "1" : "2") << " wins!" << std::endl;
+                    m_gameState = GameState::SELECT;
+                    m_p1RoundsWon = 0;
+                    m_p2RoundsWon = 0;
+                    m_roundNumber = 1;
+                    m_player.reset();
+                    m_dummy.reset();
+                    m_hudP1.reset();
+                    m_hudP2.reset();
+                    m_helpers.clear();
+                    m_sparks.clear();
+                    m_selectPhase = 0;
                 } else {
                     resetRound();
                     m_roundNumber++;
@@ -850,6 +937,108 @@ namespace db {
         window_.setView(shakeView);
 
         window_.clear(sf::Color(200, 200, 200));
+
+        // 选人界面
+        if (m_gameState == GameState::SELECT) {
+            window_.setView(m_uiView);
+            // 背景
+            sf::RectangleShape bg({1920, 1080});
+            bg.setFillColor(sf::Color(20, 20, 40));
+            window_.draw(bg);
+
+            // 标题
+            sf::Text title(m_debugFont);
+            title.setString("SELECT YOUR FIGHTER");
+            title.setCharacterSize(48);
+            title.setFillColor(sf::Color::White);
+            title.setPosition({960, 60});
+            auto tb = title.getLocalBounds();
+            title.setOrigin({tb.size.x / 2, 0});
+            window_.draw(title);
+
+            // 角色网格
+            int n = static_cast<int>(m_availableChars.size());
+            int cols = 2;
+            int rows = (n + cols - 1) / cols;
+            float cellW = 350.f, cellH = 200.f;
+            float gridW = cols * cellW, gridH = rows * cellH;
+            float startX = (1920 - gridW) / 2 + cellW / 2;
+            float startY = (1080 - gridH) / 2 + cellH / 2;
+
+            for (int i = 0; i < n; i++) {
+                int row = i / cols, col = i % cols;
+                float cx = startX + col * cellW;
+                float cy = startY + row * cellH;
+
+                sf::RectangleShape card({cellW - 20, cellH - 20});
+                card.setOrigin({(cellW - 20) / 2, (cellH - 20) / 2});
+                card.setPosition({cx, cy});
+
+                // 选中高亮
+                bool p1Sel = (i == m_p1Choice);
+                bool p2Sel = (i == m_p2Choice && m_selectPhase >= 1);
+                if (p1Sel && p2Sel) {
+                    card.setFillColor(sf::Color(180, 80, 80));
+                    card.setOutlineThickness(4);
+                    card.setOutlineColor(sf::Color::White);
+                } else if (p1Sel) {
+                    card.setFillColor(sf::Color(60, 60, 180));
+                    card.setOutlineThickness(3);
+                    card.setOutlineColor(sf::Color(100, 150, 255));
+                } else if (p2Sel) {
+                    card.setFillColor(sf::Color(180, 60, 60));
+                    card.setOutlineThickness(3);
+                    card.setOutlineColor(sf::Color(255, 150, 100));
+                } else {
+                    card.setFillColor(sf::Color(50, 50, 80));
+                    card.setOutlineThickness(1);
+                    card.setOutlineColor(sf::Color(100, 100, 120));
+                }
+                window_.draw(card);
+
+                // 角色名
+                sf::Text charName(m_debugFont);
+                charName.setString(m_availableChars[i].displayName);
+                charName.setCharacterSize(28);
+                charName.setFillColor(sf::Color::White);
+                charName.setPosition({cx, cy + 10});
+                auto nb = charName.getLocalBounds();
+                charName.setOrigin({nb.size.x / 2, 0});
+                window_.draw(charName);
+            }
+
+            // 提示文字
+            sf::Text hint(m_debugFont);
+            if (m_selectPhase == 0) {
+                hint.setString("P1: WASD move, J confirm");
+            } else {
+                hint.setString("P2: IJKL move, Enter confirm");
+            }
+            hint.setCharacterSize(20);
+            hint.setFillColor(sf::Color(180, 180, 200));
+            hint.setPosition({960, 900});
+            tb = hint.getLocalBounds();
+            hint.setOrigin({tb.size.x / 2, 0});
+            window_.draw(hint);
+
+            // 选择状态
+            sf::Text status(m_debugFont);
+            status.setCharacterSize(20);
+            status.setPosition({960, 950});
+            if (m_selectPhase == 0) {
+                status.setString("Waiting for P1...");
+                status.setFillColor(sf::Color(100, 150, 255));
+            } else if (m_selectPhase == 1) {
+                status.setString("P1: " + m_availableChars[m_p1Choice].displayName + " | Waiting for P2...");
+                status.setFillColor(sf::Color(255, 150, 100));
+            }
+            tb = status.getLocalBounds();
+            status.setOrigin({tb.size.x / 2, 0});
+            window_.draw(status);
+
+            window_.display();
+            return;
+        }
 
         // Helper 按 sprpriority 排序 (让低优先级的画在底层)
         std::vector<const HelperEntity*> sortedHelpers;
