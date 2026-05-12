@@ -35,6 +35,38 @@ namespace db {
         return DirInput::NONE;
     }
 
+    // 方向匹配 (含 facing-relative 和 4-way 容差)
+    static bool dirMatches(DirInput actual, const std::string& expected, bool facingRight) {
+        DirInput target = strToDir(expected);
+        if (actual == target) return true;
+        if (actual == DirInput::NONE) return false;
+        if (expected == "F") {
+            if (facingRight) return actual == DirInput::UF || actual == DirInput::DF;
+            else return actual == DirInput::UB || actual == DirInput::DB;
+        }
+        if (expected == "B") {
+            if (facingRight) return actual == DirInput::UB || actual == DirInput::DB;
+            else return actual == DirInput::UF || actual == DirInput::DF;
+        }
+        if (expected == "D") return actual == DirInput::DF || actual == DirInput::DB;
+        if (expected == "U") return actual == DirInput::UF || actual == DirInput::UB;
+        return false;
+    }
+
+    // 方向历史去重压缩: 去除连续重复, 只保留变化点
+    static std::vector<DirInput> compressDirHistory(const InputManager& input, int maxFrames) {
+        std::vector<DirInput> hist;
+        DirInput last = DirInput::NONE;
+        for (int i = 0; i < maxFrames; i++) {
+            auto frame = input.getFrame(i);
+            if (frame.dir != last && frame.dir != DirInput::NONE) {
+                hist.push_back(frame.dir);
+                last = frame.dir;
+            }
+        }
+        return hist;
+    }
+
     void CmdParser::load(const std::string& path) {
         std::ifstream file(path);
         if (!file.is_open()) {
@@ -187,6 +219,37 @@ namespace db {
                 token.type = CommandToken::DIR;
                 token.value = part.substr(1);
                 std::transform(token.value.begin(), token.value.end(), token.value.begin(), ::toupper);
+                tokens.push_back(token);
+                continue;
+            }
+
+            // 检查是否带 ~ (释放方向)
+            if (part[0] == '~') {
+                std::string rest = part.substr(1);
+                // 可选: ~30 蓄力数字前缀, 先忽略数字部分
+                while (!rest.empty() && std::isdigit(rest[0])) rest = rest.substr(1);
+                if (rest.empty()) continue;
+                // 检查 $ 4-way
+                if (rest[0] == '$' && rest.size() > 1) {
+                    token.type = CommandToken::HOLD_DIR;
+                    token.value = rest.substr(1);
+                    std::transform(token.value.begin(), token.value.end(), token.value.begin(), ::toupper);
+                } else {
+                    std::string upper = rest;
+                    std::transform(upper.begin(), upper.end(), upper.begin(), ::toupper);
+                    if ((upper == "F" || upper == "B" || upper == "D" || upper == "U" ||
+                         upper == "DF" || upper == "DB" || upper == "UF" || upper == "UB") &&
+                        rest == upper) {
+                        token.type = CommandToken::DIR;
+                        token.value = upper;
+                    } else if (rest.size() == 1) {
+                        token.type = CommandToken::BUTTON;
+                        token.value = toLower(rest);
+                    } else {
+                        continue;
+                    }
+                }
+                token.released = true;
                 tokens.push_back(token);
                 continue;
             }
@@ -384,6 +447,59 @@ namespace db {
                     }
                 }
                 return allPressed;
+            }
+        }
+
+        // 多 token 方向序列匹配 (≥3 tokens, 如 ~D,DF,F,a)
+        if (tokens.size() >= 3) {
+            // 1. 提取方向 token 和最终按钮
+            std::vector<const CommandToken*> dirTokens;
+            const CommandToken* finalBtn = nullptr;
+            for (const auto& t : tokens) {
+                if (t.type == CommandToken::DIR || t.type == CommandToken::HOLD_DIR) {
+                    dirTokens.push_back(&t);
+                } else if (t.type == CommandToken::BUTTON || t.type == CommandToken::SIMUL) {
+                    finalBtn = &t;
+                    break;
+                }
+            }
+            if (dirTokens.size() < 2 || !finalBtn) return false;
+
+            // 2. 获取压缩方向历史
+            auto hist = compressDirHistory(input, std::min(cmd.time, 60));
+
+            // 3. 检查按钮是否在当前帧/最近帧按下
+            bool btnPressed = false;
+            if (finalBtn->type == CommandToken::BUTTON) {
+                for (int fb = 0; fb <= std::min(cmd.time, 10); fb++) {
+                    if (input.justPressed(finalBtn->value[0])) { btnPressed = true; break; }
+                }
+            } else if (finalBtn->type == CommandToken::SIMUL) {
+                std::stringstream ss(finalBtn->value);
+                std::string item;
+                bool allHeld = true;
+                while (std::getline(ss, item, '+')) {
+                    item = trim(item);
+                    if (!item.empty() && !input.isHeld(item)) { allHeld = false; break; }
+                }
+                btnPressed = allHeld;
+            }
+            if (!btnPressed) return false;
+
+            // 4. 在历史中搜索方向序列
+            if (hist.size() >= dirTokens.size()) {
+                for (size_t s = 0; s + dirTokens.size() <= hist.size(); s++) {
+                    bool match = true;
+                    for (size_t j = 0; j < dirTokens.size(); j++) {
+                        DirInput actual = hist[s + j];
+                        const std::string& expected = dirTokens[j]->value;
+                        if (!dirMatches(actual, expected, facingRight)) {
+                            match = false;
+                            break;
+                        }
+                    }
+                    if (match) return true;
+                }
             }
         }
 

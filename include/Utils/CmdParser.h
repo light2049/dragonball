@@ -43,6 +43,7 @@ namespace db {
             };
             Type type;
             std::string value;
+            bool released = false;  // ~ 前缀: 方向释放检测
         };
 
         // 将命令字符串解析为 token 序列
