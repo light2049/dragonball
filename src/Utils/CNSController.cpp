@@ -135,7 +135,7 @@ namespace db {
         for (const auto& tl : triggers) {
             if (!tl.allFlag) continue;
             for (const auto& cond : tl.conditions) {
-                if (!cond.evaluate(fighter, inputMgr)) return false;
+                if (!cond.evaluate(fighter, inputMgr, stateTime)) return false;
             }
         }
 
@@ -177,7 +177,7 @@ namespace db {
         return -1;
     }
 
-    bool Condition::evaluate(const Fighter& fighter, const InputManager* inputMgr) const {
+    bool Condition::evaluate(const Fighter& fighter, const InputManager* inputMgr, int stateTime) const {
         bool result = false;
 
         switch (type) {
@@ -190,7 +190,7 @@ namespace db {
                 break;
 
             case CondType::TIME: {
-                int time = fighter.getStateTime();
+                int time = (stateTime >= 0) ? stateTime : fighter.getStateTime();
                 int val = rhsInt;
                 if (isRange && !rangeExpr.empty()) {
                     val = fighter.getHitVar(rangeExpr);

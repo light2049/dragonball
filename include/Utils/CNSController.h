@@ -95,7 +95,7 @@ namespace db {
         int paramInt2 = 0; // 用于 timemod = N,M
 
         // 评估此条件
-        bool evaluate(const Fighter& fighter, const InputManager* inputMgr) const;
+        bool evaluate(const Fighter& fighter, const InputManager* inputMgr, int stateTime = -1) const;
     };
 
     // 单条 trigger (trigger1, trigger2 等)
