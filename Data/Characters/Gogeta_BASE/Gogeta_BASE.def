@@ -1,0 +1,28 @@
+;***************************************************************************;
+;******************* Created in Fighter Factory Ultimate *******************;
+;*******************      http://www.virtualltek.com     *******************;
+;***************************************************************************;
+
+[Info]
+name = "Gogeta_BASE_SWL"
+displayname = "Gogeta"
+versiondate = 
+mugenversion = 1.0
+author = "Game Zip"
+pal.defaults = 1
+
+[Files]
+sprite = Gogeta_BASE_SWL.sff
+anim = Gogeta_BASE_SWL.air
+sound = Gogeta_BASE_SWL.snd
+cmd = Gogeta_BASE_SWL.cmd
+cns = Gogeta_BASE_SWL.cns
+stcommon = common1.cns
+st = Gogeta_BASE_SWL.cns
+pal1 = Gogeta_BASE_SWL.act
+pal2 = 2.act
+pal3 = 3.act
+
+[Arcade]
+intro.storyboard = 
+ending.storyboard = 
