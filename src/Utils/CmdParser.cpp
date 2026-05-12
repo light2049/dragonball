@@ -53,11 +53,11 @@ namespace db {
         return false;
     }
 
-    // 方向历史去重压缩: 去除连续重复, 只保留变化点
+    // 方向历史去重压缩: 去除连续重复, 只保留变化点 (从天到近)
     static std::vector<DirInput> compressDirHistory(const InputManager& input, int maxFrames) {
         std::vector<DirInput> hist;
         DirInput last = DirInput::NONE;
-        for (int i = 0; i < maxFrames; i++) {
+        for (int i = maxFrames - 1; i >= 0; i--) {
             auto frame = input.getFrame(i);
             if (frame.dir != last && frame.dir != DirInput::NONE) {
                 hist.push_back(frame.dir);
@@ -465,16 +465,32 @@ namespace db {
             }
             if (dirTokens.size() < 2 || !finalBtn) return false;
 
-            // 2. 获取压缩方向历史
-            auto hist = compressDirHistory(input, std::min(cmd.time, 60));
+            int window = std::min(cmd.time, 60);
 
-            // 3. 检查按钮是否在当前帧/最近帧按下
-            bool btnPressed = false;
-            if (finalBtn->type == CommandToken::BUTTON) {
-                for (int fb = 0; fb <= std::min(cmd.time, 10); fb++) {
-                    if (input.justPressed(finalBtn->value[0])) { btnPressed = true; break; }
+            // 2. 在时间窗口内找按钮刚按下的帧 (从当前帧往回找)
+            int btnFrame = -1;
+            auto checkBtnState = [&](const FrameInput& fi) -> bool {
+                if (finalBtn->type == CommandToken::SIMUL) return false;
+                char c = finalBtn->value[0];
+                if (c == 'x') return fi.x; if (c == 'y') return fi.y;
+                if (c == 'z') return fi.z; if (c == 'a') return fi.a;
+                if (c == 'b') return fi.b; if (c == 'c') return fi.c;
+                if (c == 's') return fi.s;
+                return false;
+            };
+            for (int fb = 0; fb < window; fb++) {
+                auto frame = input.getFrame(fb);
+                if (checkBtnState(frame)) {
+                    auto prev = input.getFrame(fb + 1);
+                    if (!checkBtnState(prev)) {
+                        btnFrame = fb;
+                        break;
+                    }
                 }
-            } else if (finalBtn->type == CommandToken::SIMUL) {
+            }
+
+            // 2b. SIMUL 按钮检测
+            if (btnFrame < 0 && finalBtn->type == CommandToken::SIMUL) {
                 std::stringstream ss(finalBtn->value);
                 std::string item;
                 bool allHeld = true;
@@ -482,16 +498,27 @@ namespace db {
                     item = trim(item);
                     if (!item.empty() && !input.isHeld(item)) { allHeld = false; break; }
                 }
-                btnPressed = allHeld;
+                if (allHeld) btnFrame = 0;
             }
-            if (!btnPressed) return false;
 
-            // 4. 在历史中搜索方向序列
-            if (hist.size() >= dirTokens.size()) {
-                for (size_t s = 0; s + dirTokens.size() <= hist.size(); s++) {
+            if (btnFrame < 0) return false;
+
+            // 3. 获取窗口期内完整的方向历史 (从天到近)
+            auto dirHist = compressDirHistory(input, window);
+
+            // DEBUG: 有按钮按下时打印
+            if (!cmd.name.empty() && cmd.name[0] >= '6' && cmd.name[0] <= '9') {
+                static int dbgFrames = 0;
+                if (++dbgFrames % 60 == 1) {
+                }
+            }
+
+            // 4. 在方向历史中搜索命令方向序列
+            if (dirHist.size() >= dirTokens.size()) {
+                for (size_t s = 0; s + dirTokens.size() <= dirHist.size(); s++) {
                     bool match = true;
                     for (size_t j = 0; j < dirTokens.size(); j++) {
-                        DirInput actual = hist[s + j];
+                        DirInput actual = dirHist[s + j];
                         const std::string& expected = dirTokens[j]->value;
                         if (!dirMatches(actual, expected, facingRight)) {
                             match = false;

@@ -581,12 +581,6 @@ namespace db {
                 lastDbgState = m_currentStateNo;
                 bool hs = inputMgr.isHeld("hold_s");
                 bool ctrl = hasControl();
-                std::cout << "[ChargeDBG] State=" << m_currentStateNo
-                          << " hold_s=" << hs
-                          << " ctrl=" << ctrl
-                          << " power=" << m_currentPower
-                          << " timer=" << static_cast<int>(m_stateTimer * 60.f)
-                          << std::endl;
             }
         }
         // 5a. 执行 State -2 (每帧控制器, 如 AssertSpecial, 自动切换等)

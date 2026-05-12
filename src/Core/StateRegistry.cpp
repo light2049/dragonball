@@ -62,10 +62,6 @@ namespace db {
                               << " val=" << ctrl->value << std::endl;
                 }
                 if ((currentState == 195 || currentState == 196) && ctrl->type == ControllerType::CHANGESTATE) {
-                    std::cout << "[ChargeCS] " << currentState << " -> "
-                              << fighter.getCurrentStateNo() << " val=" << ctrl->value
-                              << " hold_s=" << (inputMgr ? inputMgr->isHeld("hold_s") : false)
-                              << std::endl;
                 }
                 break;
             }
