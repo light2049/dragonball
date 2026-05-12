@@ -505,6 +505,20 @@ namespace db {
                 break;
             }
 
+            case CondType::AILEVEL: {
+                int ai = fighter.getAILevel();
+                switch (op) {
+                    case CondOp::EQ:  result = (ai == rhsInt); break;
+                    case CondOp::NEQ: result = (ai != rhsInt); break;
+                    case CondOp::GT:  result = (ai > rhsInt); break;
+                    case CondOp::GTE: result = (ai >= rhsInt); break;
+                    case CondOp::LT:  result = (ai < rhsInt); break;
+                    case CondOp::LTE: result = (ai <= rhsInt); break;
+                    default: result = (ai == rhsInt); break;
+                }
+                break;
+            }
+
             case CondType::TIMEMOD: {
                 int time = fighter.getStateTime();
                 int mod = rhsInt;

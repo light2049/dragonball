@@ -574,6 +574,21 @@ namespace db {
         if (m_currentStateNo != 20) {
             m_stateRegistry.executeState(m_currentStateNo, *this, &inputMgr, dt);
         }
+        // DEBUG: charge state tracking
+        if (m_currentStateNo == 195 || m_currentStateNo == 196 || m_currentStateNo == 0) {
+            static int lastDbgState = -1;
+            if (m_currentStateNo != lastDbgState) {
+                lastDbgState = m_currentStateNo;
+                bool hs = inputMgr.isHeld("hold_s");
+                bool ctrl = hasControl();
+                std::cout << "[ChargeDBG] State=" << m_currentStateNo
+                          << " hold_s=" << hs
+                          << " ctrl=" << ctrl
+                          << " power=" << m_currentPower
+                          << " timer=" << static_cast<int>(m_stateTimer * 60.f)
+                          << std::endl;
+            }
+        }
         // 5a. 执行 State -2 (每帧控制器, 如 AssertSpecial, 自动切换等)
         m_stateRegistry.executeState(-2, *this, &inputMgr, dt);
         // 5b. 执行 State -3 (角色自身每帧执行, 如 shadow aura, 落地音效等)

@@ -122,6 +122,7 @@ namespace db {
         void addPower(int amount);
         int getPower() const { return m_currentPower; }
         int getMaxPower() const { return m_maxPower; }
+        int getAILevel() const { return 0; }
 
         // 查询 CNS const() 值 (返回 px/tick 原始值)
         float getConstValue(const std::string& path) const;

@@ -54,12 +54,20 @@ namespace db {
 
             ctrl->execute(fighter, inputMgr, dt);
 
-            // ChangeState 执行后立即停止
-            if (fighter.getCurrentStateNo() != currentState) break;
-            if (stateNo == -1 && ctrl->type == ControllerType::CHANGESTATE) {
-                std::cout << "[State-1] state=" << fighter.getCurrentStateNo()
-                          << " ctrl=" << fighter.hasControl()
-                          << " val=" << ctrl->value << std::endl;
+            // ChangeState执行后立即停止
+            if (fighter.getCurrentStateNo() != currentState) {
+                if (stateNo == -1 && ctrl->type == ControllerType::CHANGESTATE) {
+                    std::cout << "[State-1] state=" << fighter.getCurrentStateNo()
+                              << " ctrl=" << fighter.hasControl()
+                              << " val=" << ctrl->value << std::endl;
+                }
+                if ((currentState == 195 || currentState == 196) && ctrl->type == ControllerType::CHANGESTATE) {
+                    std::cout << "[ChargeCS] " << currentState << " -> "
+                              << fighter.getCurrentStateNo() << " val=" << ctrl->value
+                              << " hold_s=" << (inputMgr ? inputMgr->isHeld("hold_s") : false)
+                              << std::endl;
+                }
+                break;
             }
         }
     }
