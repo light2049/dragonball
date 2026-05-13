@@ -320,6 +320,30 @@ src/Core/StateRegistry.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles\DragonBall.dir\build.make CMakeFiles/DragonBall.dir/src/Core/StateRegistry.cpp.s
 .PHONY : src/Core/StateRegistry.cpp.s
 
+src/UI/BitmapFont.obj: src/UI/BitmapFont.cpp.obj
+.PHONY : src/UI/BitmapFont.obj
+
+# target to build an object file
+src/UI/BitmapFont.cpp.obj:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\DragonBall.dir\build.make CMakeFiles/DragonBall.dir/src/UI/BitmapFont.cpp.obj
+.PHONY : src/UI/BitmapFont.cpp.obj
+
+src/UI/BitmapFont.i: src/UI/BitmapFont.cpp.i
+.PHONY : src/UI/BitmapFont.i
+
+# target to preprocess a source file
+src/UI/BitmapFont.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\DragonBall.dir\build.make CMakeFiles/DragonBall.dir/src/UI/BitmapFont.cpp.i
+.PHONY : src/UI/BitmapFont.cpp.i
+
+src/UI/BitmapFont.s: src/UI/BitmapFont.cpp.s
+.PHONY : src/UI/BitmapFont.s
+
+# target to generate assembly for a file
+src/UI/BitmapFont.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles\DragonBall.dir\build.make CMakeFiles/DragonBall.dir/src/UI/BitmapFont.cpp.s
+.PHONY : src/UI/BitmapFont.cpp.s
+
 src/UI/HUD.obj: src/UI/HUD.cpp.obj
 .PHONY : src/UI/HUD.obj
 
@@ -497,6 +521,9 @@ help:
 	@echo ... src/Core/StateRegistry.obj
 	@echo ... src/Core/StateRegistry.i
 	@echo ... src/Core/StateRegistry.s
+	@echo ... src/UI/BitmapFont.obj
+	@echo ... src/UI/BitmapFont.i
+	@echo ... src/UI/BitmapFont.s
 	@echo ... src/UI/HUD.obj
 	@echo ... src/UI/HUD.i
 	@echo ... src/UI/HUD.s

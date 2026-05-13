@@ -28,4 +28,4 @@ namespace db {
         static sf::Texture s_texPowerFill;
         static sf::Texture s_texTimer;
     };
-} // namespace db
+}

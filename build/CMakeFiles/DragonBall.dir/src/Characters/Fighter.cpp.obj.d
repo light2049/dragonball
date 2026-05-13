@@ -331,6 +331,7 @@ CMakeFiles/DragonBall.dir/src/Characters/Fighter.cpp.obj: \
  D:/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/c++/bits/stl_deque.h \
  D:/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/c++/bits/deque.tcc \
  D:/DragonBall/include/Utils/CmdParser.h \
+ D:/DragonBall/include/Utils/SFFDatabase.h \
  D:/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/c++/iostream \
  D:/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/c++/algorithm \
  D:/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/c++/bits/ranges_algo.h \

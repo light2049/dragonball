@@ -16,6 +16,7 @@ set(CMAKE_DEPENDS_DEPENDENCY_FILES
   "D:/DragonBall/src/Core/InputManager.cpp" "CMakeFiles/DragonBall.dir/src/Core/InputManager.cpp.obj" "gcc" "CMakeFiles/DragonBall.dir/src/Core/InputManager.cpp.obj.d"
   "D:/DragonBall/src/Core/ResourceManager.cpp" "CMakeFiles/DragonBall.dir/src/Core/ResourceManager.cpp.obj" "gcc" "CMakeFiles/DragonBall.dir/src/Core/ResourceManager.cpp.obj.d"
   "D:/DragonBall/src/Core/StateRegistry.cpp" "CMakeFiles/DragonBall.dir/src/Core/StateRegistry.cpp.obj" "gcc" "CMakeFiles/DragonBall.dir/src/Core/StateRegistry.cpp.obj.d"
+  "D:/DragonBall/src/UI/BitmapFont.cpp" "CMakeFiles/DragonBall.dir/src/UI/BitmapFont.cpp.obj" "gcc" "CMakeFiles/DragonBall.dir/src/UI/BitmapFont.cpp.obj.d"
   "D:/DragonBall/src/UI/HUD.cpp" "CMakeFiles/DragonBall.dir/src/UI/HUD.cpp.obj" "gcc" "CMakeFiles/DragonBall.dir/src/UI/HUD.cpp.obj.d"
   "D:/DragonBall/src/Utils/AirParser.cpp" "CMakeFiles/DragonBall.dir/src/Utils/AirParser.cpp.obj" "gcc" "CMakeFiles/DragonBall.dir/src/Utils/AirParser.cpp.obj.d"
   "D:/DragonBall/src/Utils/CNSController.cpp" "CMakeFiles/DragonBall.dir/src/Utils/CNSController.cpp.obj" "gcc" "CMakeFiles/DragonBall.dir/src/Utils/CNSController.cpp.obj.d"

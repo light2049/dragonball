@@ -15,7 +15,7 @@ namespace db {
         int newId = anim.id;
 
         if (m_currentAnimation && m_currentAnimation->id == newId) {
-            // 相同动画 ID 不重置，让动画继续播放
+
             return;
         }
 
@@ -106,11 +106,9 @@ namespace db {
             blendMode = frame.blendMode;
         }
 
-        // 应用 AngleDraw scale 覆盖
         float extraScaleX = overrides ? overrides->scaleX : 1.f;
         float extraScaleY = overrides ? overrides->scaleY : 1.f;
 
-        // 轴对齐: 精灵的轴 (axisX, axisY) 对齐到 position，受缩放影响
         float renderScaleX = (m_facingRight ? 1.0f : -1.0f) * m_scaleX * extraScaleX;
         float finalX = position.x - axisX * renderScaleX;
         float finalY = position.y - axisY * m_scaleY * extraScaleY;
@@ -121,11 +119,10 @@ namespace db {
             tempSprite.setRotation(sf::degrees(overrides->rotation));
         }
 
-        // 应用 Trans alpha 覆盖
         if (overrides) {
             sf::Color c = tempSprite.getColor();
             c.a = overrides->alpha;
-            // 受击闪白: 将颜色向白色混合
+
             if (overrides->hitFlash > 0) {
                 uint8_t flash = overrides->hitFlash;
                 c.r = static_cast<uint8_t>(c.r + (255 - c.r) * flash / 255);
@@ -160,7 +157,6 @@ namespace db {
             blendMode = frame.blendMode;
         }
 
-        // 轴对齐: 精灵的轴 (axisX, axisY) 对齐到 position，受缩放影响
         float renderScaleX = (m_facingRight ? 1.0f : -1.0f) * m_scaleX;
         float finalX = position.x - axisX * renderScaleX;
         float finalY = position.y - axisY * m_scaleY;
@@ -184,7 +180,7 @@ namespace db {
     void AnimationPlayer::setScale(float x, float y) {
         m_scaleX = x;
         m_scaleY = y;
-        // Apply scale to current sprite if it exists
+
         if (m_sprite) {
             m_sprite->setScale({x, y});
         }
@@ -209,4 +205,4 @@ namespace db {
         return {0.f, 0.f};
     }
 
-} // namespace db
+}

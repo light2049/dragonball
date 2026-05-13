@@ -15,6 +15,8 @@ file(REMOVE_RECURSE
   "CMakeFiles/DragonBall.dir/src/Core/ResourceManager.cpp.obj.d"
   "CMakeFiles/DragonBall.dir/src/Core/StateRegistry.cpp.obj"
   "CMakeFiles/DragonBall.dir/src/Core/StateRegistry.cpp.obj.d"
+  "CMakeFiles/DragonBall.dir/src/UI/BitmapFont.cpp.obj"
+  "CMakeFiles/DragonBall.dir/src/UI/BitmapFont.cpp.obj.d"
   "CMakeFiles/DragonBall.dir/src/UI/HUD.cpp.obj"
   "CMakeFiles/DragonBall.dir/src/UI/HUD.cpp.obj.d"
   "CMakeFiles/DragonBall.dir/src/Utils/AirParser.cpp.obj"

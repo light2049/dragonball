@@ -21,4 +21,4 @@ private:
     char fileNameToChar(const std::string& name) const;
 };
 
-} // namespace db
+}

@@ -85,29 +85,26 @@ namespace db {
         int m_superPauseTimer = 0;
         bool m_superPauseDarken = false;
 
-        // UI 字体
         BitmapFont m_bitmapFont;
         bool m_useBitmapFont = false;
 
-        // 角色定义
         struct CharacterDef {
             std::string dirName;
             std::string displayName;
-            sf::Texture portraitSmall;   // 小头像
-            sf::Texture portraitLarge;   // 大立绘
+            sf::Texture portraitSmall;
+            sf::Texture portraitLarge;
         };
         struct StageDef {
             std::string name;
             std::string dirPath;
-            sf::Texture preview;         // 场景预览图
-            sf::Texture background;      // 战斗背景
+            sf::Texture preview;
+            sf::Texture background;
         };
 
         std::vector<CharacterDef> discoverCharacters();
         std::vector<StageDef> discoverStages();
         void initFight(int p1Choice, int p2Choice, int stageChoice);
 
-        // 回合系统
         enum class GameState { TITLE, SELECT, STAGE_SELECT, INTRO, FIGHT, KO };
         GameState m_gameState = GameState::TITLE;
         int m_roundNumber = 1;
@@ -116,21 +113,18 @@ namespace db {
         float m_koTimer = 0.f;
         float m_roundTimer = 0.f;
 
-        // 选人界面
         std::vector<CharacterDef> m_availableChars;
         int m_p1Choice = 0;
         int m_p2Choice = 0;
         int m_selectPhase = 0;
-        float m_selectAnimPos = 0.f;     // 轮播滑动动画位置
-        float m_selectOffsetY = 150.f;     // 选人角色Y偏移
-        float m_selectSpacing = 710.f;     // 两侧预览图到中心距离
+        float m_selectAnimPos = 0.f;
+        float m_selectOffsetY = 150.f;
+        float m_selectSpacing = 710.f;
 
-        // 选图界面
         std::vector<StageDef> m_availableStages;
         int m_stageChoice = 0;
-        float m_stageAnimPos = 0.f;      // 场景轮播动画
+        float m_stageAnimPos = 0.f;
 
-        // UI 贴图
         sf::Texture m_texTitleBg;
         sf::Texture m_texSelectBg;
         sf::Texture m_texSelectArrowL;
@@ -143,10 +137,8 @@ namespace db {
         sf::Texture m_texStageArrowR;
         sf::Texture m_texStageCursor;
 
-        // 当前选中的场景的战斗背景
         sf::Texture m_stageBg;
 
-        // 视图
         sf::View m_uiView{sf::FloatRect({0, 0}, {1920, 1080})};
         sf::View m_gameView{sf::FloatRect({0, 0}, {800, 600})};
         sf::Vector2u m_windowSize{960, 540};
@@ -156,4 +148,4 @@ namespace db {
         std::vector<HelperEntity> m_helpers;
     };
 
-} // namespace db
+}

@@ -3,9 +3,6 @@
 
 namespace db {
 
-    // M.U.G.E.N 按键映射
-    // 6键布局: x(轻拳) y(中拳) z(重拳) a(轻踢) b(中踢) c(重踢)
-    // 键盘映射: J=x, I=y, O=z, K=a, L=b, U=c, Space=s, L=charge
     static sf::Keyboard::Key mapMugenButton(char btn) {
         switch (btn) {
             case 'x': return sf::Keyboard::Key::J;
@@ -34,7 +31,6 @@ namespace db {
         }
     }
 
-    // 基于事件的按键状态查询 (替代 sf::Keyboard::isKeyPressed 轮询)
     static bool eventKeyHeld(const bool eventState[128], sf::Keyboard::Key key) {
         int k = static_cast<int>(key);
         return k >= 0 && k < 128 && eventState[k];
@@ -45,7 +41,6 @@ namespace db {
 
         FrameInput snap;
 
-        // 按键状态全部基于事件 (press/release)，不依赖轮询
         snap.x = eventKeyHeld(m_eventKeyState, mapMugenButton('x'));
         snap.y = eventKeyHeld(m_eventKeyState, mapMugenButton('y'));
         snap.z = eventKeyHeld(m_eventKeyState, mapMugenButton('z'));
@@ -54,10 +49,8 @@ namespace db {
         snap.c = eventKeyHeld(m_eventKeyState, mapMugenButton('c'));
         snap.s = eventKeyHeld(m_eventKeyState, mapMugenButton('s'));
 
-        // 蓄气键
         snap.charge = eventKeyHeld(m_eventKeyState, sf::Keyboard::Key::L) || snap.s;
 
-        // 方向同样基于事件
         updateDirection(snap);
 
         m_current = snap;
@@ -83,7 +76,6 @@ namespace db {
         bool left = eventKeyHeld(m_eventKeyState, sf::Keyboard::Key::A) || eventKeyHeld(m_eventKeyState, sf::Keyboard::Key::Left);
         bool right = eventKeyHeld(m_eventKeyState, sf::Keyboard::Key::D) || eventKeyHeld(m_eventKeyState, sf::Keyboard::Key::Right);
 
-        // M.U.G.E.N 8方向判定 (优先级: 斜方向优先)
         if (up && right)       snap.dir = DirInput::UF;
         else if (up && left)   snap.dir = DirInput::UB;
         else if (down && right) snap.dir = DirInput::DF;
@@ -97,7 +89,7 @@ namespace db {
 
     void InputManager::pushHistory(const FrameInput& snap) {
         m_history.push_back(snap);
-        // 保留最近 60 帧 (1秒)
+
         if (m_history.size() > 60) {
             m_history.pop_front();
         }
@@ -150,7 +142,7 @@ namespace db {
     }
 
     bool InputManager::isHeld(const std::string& cmdName) const {
-        // 先查命令结果缓存 (由 CmdParser 填充)
+
         auto it = m_commandResults.find(cmdName);
         if (it != m_commandResults.end()) {
             return it->second;
@@ -158,7 +150,6 @@ namespace db {
 
         DirInput dir = m_current.dir;
 
-        // /$F = 按住前 (F, UF, DF 任一)
         if (cmdName == "holdfwd" || cmdName == "F") {
             return dir == DirInput::F || dir == DirInput::UF || dir == DirInput::DF;
         }
@@ -171,13 +162,12 @@ namespace db {
         if (cmdName == "holdup" || cmdName == "U") {
             return dir == DirInput::U || dir == DirInput::UF || dir == DirInput::UB;
         }
-        // 精确方向
+
         if (cmdName == "holddownfwd" || cmdName == "DF") return dir == DirInput::DF;
         if (cmdName == "holddownback" || cmdName == "DB") return dir == DirInput::DB;
         if (cmdName == "holdupfwd" || cmdName == "UF") return dir == DirInput::UF;
         if (cmdName == "holdupback" || cmdName == "UB") return dir == DirInput::UB;
 
-        // 按钮长按
         if (cmdName == "hold_x") return m_current.x;
         if (cmdName == "hold_y") return m_current.y;
         if (cmdName == "hold_z") return m_current.z;
@@ -186,7 +176,6 @@ namespace db {
         if (cmdName == "hold_c") return m_current.c;
         if (cmdName == "hold_s") return m_current.s;
 
-        // 普通按钮 (非 hold)
         if (cmdName == "x") return m_current.x;
         if (cmdName == "y") return m_current.y;
         if (cmdName == "z") return m_current.z;
@@ -195,7 +184,6 @@ namespace db {
         if (cmdName == "c") return m_current.c;
         if (cmdName == "s") return m_current.s;
 
-        // 方向 (非 hold)
         if (cmdName == "fwd" || cmdName == "F") return dir == DirInput::F;
         if (cmdName == "back" || cmdName == "B") return dir == DirInput::B;
         if (cmdName == "down" || cmdName == "D") return dir == DirInput::D;
@@ -214,7 +202,6 @@ namespace db {
         int histSize = static_cast<int>(m_history.size());
         int checkLen = std::min(window, histSize);
 
-        // 从最新帧往前匹配序列 (从seq的末尾开始匹配)
         int seqIdx = static_cast<int>(seq.size()) - 1;
         for (int i = histSize - 1; i >= histSize - checkLen && seqIdx >= 0; i--) {
             if (i < 0) break;
@@ -225,22 +212,20 @@ namespace db {
         return seqIdx < 0;
     }
 
-    // 双击方向检测
     bool InputManager::doubleTap(DirInput dir, int window) const {
         if (m_history.size() < 3) return false;
 
         int lastFrame = static_cast<int>(m_history.size()) - 1;
-        // 当前帧方向必须是指定方向
+
         if (m_history[lastFrame].dir != dir) return false;
 
-        // 往前找相同方向，中间有间隔(松开)
         bool foundGap = false;
         for (int i = lastFrame - 1; i >= std::max(0, lastFrame - window); i--) {
             if (m_history[i].dir == dir) {
-                return foundGap; // 找到第二次出现，且中间有间隔
+                return foundGap;
             }
             if (m_history[i].dir == DirInput::NONE) {
-                foundGap = true; // 中间有过方向松开
+                foundGap = true;
             }
         }
         return false;
@@ -255,4 +240,4 @@ namespace db {
         return m_current;
     }
 
-} // namespace db
+}

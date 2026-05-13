@@ -68,7 +68,13 @@
       "Bash(awk -F: '{if\\(NR>=48 && NR<=65\\) printf \"%3d: %s\\\\n\", $1, $2}')",
       "Bash(sed -i '/^0\\\\t62\\\\t33\\\\t76\\\\t16\\\\t74\\\\t38\\\\t1\\\\tPCX/ i 0\\\\t61\\\\t32\\\\t71\\\\t16\\\\t69\\\\t38\\\\t1\\\\tPCX' \"D:/DragonBall/Data/Characters/Goku_MUI/sprite_database_Goku_MUI.txt\")",
       "Bash(sed -i '/^0\\\\t67\\\\t28\\\\t56\\\\t16\\\\t55\\\\t42\\\\t1\\\\tPCX/ i 0\\\\t66\\\\t27\\\\t56\\\\t13\\\\t54\\\\t41\\\\t1\\\\tPCX' \"D:/DragonBall/Data/Characters/Goku_MUI/sprite_database_Goku_MUI.txt\")",
-      "Bash(python3 *)"
+      "Bash(python3 *)",
+      "Bash(grep -n \"namespace\\\\|^}\\\\s*//\\\\|^}\\\\s*$\" \"D:/DragonBall/src/Core/Game.cpp\")",
+      "Bash(g++ -std=c++20 -I include -I \"D:/SFML-3.0.2/include\" -fsyntax-only \"D:/DragonBall/src/Core/Game.cpp\")",
+      "Bash(awk '{for\\(i=1;i<=length;i++\\){c=substr\\($0,i,1\\);if\\(c==\"{\"\\)op++;if\\(c==\"}\"\\)cl++}} END {print \"Opened:\",op,\"Closed:\",cl,\"Net:\",op-cl}')",
+      "Bash(grep -n \"^        }$\" \"D:/DragonBall/src/Core/Game.cpp\")",
+      "Bash(grep *)",
+      "Bash(python *)"
     ]
   }
 }

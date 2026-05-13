@@ -6,10 +6,6 @@
 
 namespace db {
 
-// ==========================================
-// 局部辅助函数 (仅在 cpp 文件内部可见，不会引起链接错误)
-// ==========================================
-
 namespace {
     std::string trim(const std::string& str) {
         size_t start = str.find_first_not_of(" \t\r\n");
@@ -56,16 +52,11 @@ namespace {
     }
 }
 
-// ==========================================
-// AirParser 核心实现
-// ==========================================
-
 std::map<int, Animation> AirParser::parse(const std::string& filePath,
                                           const std::string& basePath,
                                           const std::string& prefix,
                                           SFFDatabase& sffDb) {
-    // 加载 SFF 轴数据库 (懒加载，仅首次成功加载后不再重复)
-    // 数据库文件在角色根目录 (basePath 是 Sprites/ 子目录，需要回退一层)
+
     std::string dbPath = basePath + "../sprite_database_" + prefix + ".txt";
     if (!sffDb.lookup(0, 1)) {
         sffDb.load(dbPath);
@@ -93,7 +84,6 @@ std::map<int, Animation> AirParser::parse(const std::string& filePath,
         line = trim(line);
         if (line.empty() || line.starts_with(";")) continue;
 
-        // 1. Action 开始
         if (line.starts_with("[Begin Action ")) {
             size_t end = line.find(']', 14);
             if (end != std::string::npos) {
@@ -108,7 +98,6 @@ std::map<int, Animation> AirParser::parse(const std::string& filePath,
             continue;
         }
 
-        // 2. 循环标记
         if (line == "LoopStart" || line == "Loopstart") {
             if (currentGroup != -1 && animations.contains(currentGroup)) {
                 animations[currentGroup].loopStartIndex = static_cast<int>(animations[currentGroup].frames.size());
@@ -116,7 +105,6 @@ std::map<int, Animation> AirParser::parse(const std::string& filePath,
             continue;
         }
 
-        // 3. 碰撞框定义
         if (line.starts_with("Clsn")) {
             size_t colonPos = line.find(':');
             if (colonPos != std::string::npos) {
@@ -139,7 +127,6 @@ std::map<int, Animation> AirParser::parse(const std::string& filePath,
             continue;
         }
 
-        // 4. 帧数据
         if (currentGroup != -1) {
             bool looksLikeFrame = false;
             if (!line.empty() && !line.starts_with("[")) {
@@ -160,14 +147,11 @@ std::map<int, Animation> AirParser::parse(const std::string& filePath,
                     std::getline(iss, token, ','); oy = std::stoi(trim(token));
                     std::getline(iss, token, ','); dur = std::stoi(trim(token));
 
-                    // x-scale / flip flags
                     std::getline(iss, token, ',');
                     if (token.find('H') != std::string::npos) flip = true;
 
-                    // y-scale / vertical flip
                     std::getline(iss, token, ',');
 
-                    // transparency mode: A=additive, S=subtractive
                     std::getline(iss, token, ',');
                     std::string blendStr = trim(token);
                     if (blendStr == "A") blend = BlendMode::Additive;
@@ -183,7 +167,6 @@ std::map<int, Animation> AirParser::parse(const std::string& filePath,
                         .clsn2 = nextClsn2
                     };
 
-                    // 用 SFF 轴数据修正 offset 并存储 raw axis
                     if (auto* sffData = sffDb.lookup(g, n)) {
                         frame.offset.x = -sffData->axisX;
                         frame.offset.y = sffData->height - sffData->axisY;
@@ -209,4 +192,4 @@ std::map<int, Animation> AirParser::parse(const std::string& filePath,
     return animations;
 }
 
-} // namespace db
+}

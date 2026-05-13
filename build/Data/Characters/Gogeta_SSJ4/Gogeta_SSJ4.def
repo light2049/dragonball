@@ -1,0 +1,24 @@
+[Info]
+name="Gogeta_SSJ4_SWL"
+displayname="Gogeta"
+versiondate=
+mugenversion=1.0
+author="Game Zip"
+pal.defaults=1,2,3,4,5,6
+[Files]
+sprite=Gogeta_SSJ4_SWL.sff
+sound=Gogeta_SSJ4_SWL.snd
+anim=Gogeta_SSJ4_SWL.air
+cmd=Gogeta_SSJ4_SWL.cmd
+cns=Gogeta_SSJ4_SWL.cns
+st=Gogeta_SSJ4_SWL.cns
+stcommon=common1.cns
+pal1=Gogeta_SSJ4_SWL.act
+pal2=2.act
+pal3=3.act
+pal4=4.act
+pal5=5.act
+pal6=6.act
+[Arcade]
+intro.storyboard=
+ending.storyboard=

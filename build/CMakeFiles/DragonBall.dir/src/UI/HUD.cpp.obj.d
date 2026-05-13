@@ -309,4 +309,8 @@ CMakeFiles/DragonBall.dir/src/UI/HUD.cpp.obj: \
  D:/SFML-3.0.2/include/SFML/System/FileInputStream.hpp \
  D:/SFML-3.0.2/include/SFML/System/InputStream.hpp \
  D:/SFML-3.0.2/include/SFML/System/MemoryInputStream.hpp \
- D:/SFML-3.0.2/include/SFML/System/Sleep.hpp
+ D:/SFML-3.0.2/include/SFML/System/Sleep.hpp \
+ D:/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/c++/algorithm \
+ D:/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/c++/bits/ranges_algo.h \
+ D:/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/c++/pstl/glue_algorithm_defs.h \
+ D:/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/c++/iostream

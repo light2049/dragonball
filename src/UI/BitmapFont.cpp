@@ -17,7 +17,7 @@ char BitmapFont::fileNameToChar(const std::string& name) const {
         char c = static_cast<char>(std::toupper(name[0]));
         if (std::isalnum(c)) return c;
     }
-    // Symbol name mapping
+
     struct { const char* key; char value; } map[] = {
         {"Dot", '.'}, {"Comma", ','}, {"Colon", ':'}, {"Semicolon", ';'},
         {"Exclamation_Mark", '!'}, {"Question_Mark", '?'},
@@ -34,7 +34,7 @@ char BitmapFont::fileNameToChar(const std::string& name) const {
         {"Space", ' '}, {"_", ' '},
     };
     std::string clean = name;
-    // Remove extension if present
+
     auto dotPos = clean.rfind('.');
     if (dotPos != std::string::npos) clean = clean.substr(0, dotPos);
 
@@ -75,7 +75,6 @@ bool BitmapFont::load(const std::string& directory) {
         loaded++;
     }
 
-    // Add space (invisible character)
     auto spaceTex = std::make_unique<sf::Texture>();
     if (spaceTex->resize({20, 1})) {
         m_charTextures[' '] = std::move(spaceTex);
@@ -111,7 +110,6 @@ void BitmapFont::drawText(sf::RenderWindow& window, const std::string& text,
         std::cout << " map size=" << m_charTextures.size() << "\n";
     }
 
-    // Calculate total width for centering
     float totalWidth = 0.f;
     float maxHeight = 0.f;
     float spaceWidth = static_cast<float>(charSize) * 0.4f;
@@ -126,11 +124,8 @@ void BitmapFont::drawText(sf::RenderWindow& window, const std::string& text,
         maxHeight = std::max(maxHeight, static_cast<float>(charSize));
     }
 
-    // Apply origin offset
     float startX = position.x - totalWidth * origin.x;
     float startY = position.y - maxHeight * origin.y;
-
-    // 标准空格宽度 (字符大小的 ~40%)
 
     float cursorX = startX;
     for (char c : upper) {
@@ -145,7 +140,6 @@ void BitmapFont::drawText(sf::RenderWindow& window, const std::string& text,
         float w = size.x * scale;
         float h = size.y * scale;
 
-        // 空格用固定宽度
         if (c == ' ') {
             cursorX += spaceWidth;
             continue;
@@ -161,4 +155,4 @@ void BitmapFont::drawText(sf::RenderWindow& window, const std::string& text,
     }
 }
 
-} // namespace db
+}

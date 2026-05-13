@@ -330,5 +330,7 @@ CMakeFiles/DragonBall.dir/main.cpp.obj: D:\DragonBall\main.cpp \
  D:/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/c++/deque \
  D:/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/c++/bits/stl_deque.h \
  D:/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/c++/bits/deque.tcc \
- D:/DragonBall/include/Utils/CmdParser.h D:/DragonBall/include/UI/HUD.h \
+ D:/DragonBall/include/Utils/CmdParser.h \
+ D:/DragonBall/include/Utils/SFFDatabase.h D:/DragonBall/include/UI/HUD.h \
+ D:/DragonBall/include/UI/BitmapFont.h \
  D:/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/c++/iostream

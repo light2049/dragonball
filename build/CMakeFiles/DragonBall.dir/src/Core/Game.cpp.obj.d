@@ -330,9 +330,26 @@ CMakeFiles/DragonBall.dir/src/Core/Game.cpp.obj: \
  D:/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/c++/deque \
  D:/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/c++/bits/stl_deque.h \
  D:/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/c++/bits/deque.tcc \
- D:/DragonBall/include/Utils/CmdParser.h D:/DragonBall/include/UI/HUD.h \
+ D:/DragonBall/include/Utils/CmdParser.h \
+ D:/DragonBall/include/Utils/SFFDatabase.h D:/DragonBall/include/UI/HUD.h \
+ D:/DragonBall/include/UI/BitmapFont.h \
  D:/DragonBall/include/Core/ResourceManager.h \
  D:/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/c++/iostream \
  D:/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/c++/algorithm \
  D:/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/c++/bits/ranges_algo.h \
- D:/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/c++/pstl/glue_algorithm_defs.h
+ D:/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/c++/pstl/glue_algorithm_defs.h \
+ D:/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/c++/cmath \
+ D:/mingw64/x86_64-w64-mingw32/include/math.h \
+ D:/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/c++/bits/specfun.h \
+ D:/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/c++/tr1/gamma.tcc \
+ D:/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/c++/tr1/special_function_util.h \
+ D:/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/c++/tr1/bessel_function.tcc \
+ D:/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/c++/tr1/beta_function.tcc \
+ D:/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/c++/tr1/ell_integral.tcc \
+ D:/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/c++/tr1/exp_integral.tcc \
+ D:/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/c++/tr1/hypergeometric.tcc \
+ D:/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/c++/tr1/legendre_function.tcc \
+ D:/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/c++/tr1/modified_bessel_func.tcc \
+ D:/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/c++/tr1/poly_hermite.tcc \
+ D:/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/c++/tr1/poly_laguerre.tcc \
+ D:/mingw64/lib/gcc/x86_64-w64-mingw32/15.2.0/include/c++/tr1/riemann_zeta.tcc

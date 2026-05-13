@@ -10,10 +10,6 @@
 
 namespace db {
 
-    // ==========================================
-    // 控制器工厂
-    // ==========================================
-
     ControllerType parseControllerType(const std::string& typeStr) {
         std::string t = typeStr;
         std::transform(t.begin(), t.end(), t.begin(), ::tolower);
@@ -112,26 +108,18 @@ namespace db {
         }
     }
 
-    // ==========================================
-    // CNSController 基类实现
-    // ==========================================
-
     void CNSController::parse(const std::string& key, const std::string& value) {
-        // 默认实现：存成字符串参数
+
         paramStr = value;
     }
 
     bool CNSController::checkTriggers(const Fighter& fighter, const InputManager* inputMgr, int stateTime) const {
         if (triggers.empty()) return true;
 
-        // persistent=0: 同一状态下只触发一次
         if (persistent == 0 && m_firedThisState == fighter.getCurrentStateNo()) {
             return false;
         }
 
-        // M.U.G.E.N 规则: triggerall 必须全部满足
-        // 然后 trigger1, trigger2, ... 中任何一个满足即可
-        // 先检查 triggerall
         for (const auto& tl : triggers) {
             if (!tl.allFlag) continue;
             for (const auto& cond : tl.conditions) {
@@ -139,9 +127,8 @@ namespace db {
             }
         }
 
-        // 检查 trigger1, trigger2, ...
         for (const auto& tl : triggers) {
-            if (tl.allFlag) continue; // triggerall 已经检查过了
+            if (tl.allFlag) continue;
             bool allMet = true;
             for (const auto& cond : tl.conditions) {
                 if (!cond.evaluate(fighter, inputMgr)) {
@@ -159,14 +146,9 @@ namespace db {
     }
 
     void CNSController::execute(Fighter& fighter, InputManager* inputMgr, float dt) const {
-        // 基类什么都不做
+
     }
 
-    // ==========================================
-    // 条件评估器
-    // ==========================================
-
-    // 辅助: 将字符串转换为 statetype 数值 (0=S, 1=C, 2=A, 3=L)
     static int statetypeToInt(const std::string& s) {
         std::string lower = s;
         std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
@@ -348,7 +330,7 @@ namespace db {
             case CondType::VEL_X: {
                 float vx = fighter.getVelocityX();
                 if (!fighter.isFacingRight()) { vx = -vx; }
-                // CNS 速度单位为 px/tick, 引擎为 px/s, 转换 RHS
+
                 float compareVal = rhsFloat * 60.f;
                 if (!rhsExpr.empty()) {
                     compareVal = static_cast<float>(evaluateCNSExpression(rhsExpr, fighter)) * 60.f;
@@ -367,7 +349,7 @@ namespace db {
 
             case CondType::VEL_Y: {
                 float vy = fighter.getVelocityY();
-                // CNS 速度单位为 px/tick, 引擎为 px/s, 转换 RHS
+
                 float compareVal = rhsFloat * 60.f;
                 if (!rhsExpr.empty()) {
                     compareVal = static_cast<float>(evaluateCNSExpression(rhsExpr, fighter)) * 60.f;
@@ -480,13 +462,13 @@ namespace db {
             }
 
             case CondType::P2STATETYPE: {
-                // 简化: 假设对手是站立状态
-                result = (1 == statetypeToInt(rhsStr)); // 默认 C
+
+                result = (1 == statetypeToInt(rhsStr));
                 break;
             }
 
             case CondType::P2DIST_X: {
-                // 简化: 默认距离为 999
+
                 result = false;
                 break;
             }
@@ -528,15 +510,14 @@ namespace db {
             }
 
             case CondType::CONST: {
-                // const() 简化处理 — 返回默认 true
+
                 result = true;
                 break;
             }
 
             case CondType::FRONTEDGEBODYDIST:
             case CondType::BACKEDGEBODYDIST: {
-                // 画面边缘距离 (M.U.G.E.N: FrontEdgeBodyDist/BackEdgeBodyDist)
-                // 舞台边界 [0, 800]
+
                 sf::FloatRect pushBox = fighter.getPushBox();
                 float frontDist, backDist;
                 if (fighter.isFacingRight()) {
@@ -559,17 +540,13 @@ namespace db {
             }
 
             default:
-                result = true; // 未实现的条件默认返回 true
+                result = true;
                 break;
         }
 
         if (negated) result = !result;
         return result;
     }
-
-    // ==========================================
-    // 条件解析
-    // ==========================================
 
     static std::string trimStr(const std::string& s) {
         size_t start = s.find_first_not_of(" \t\r\n");
@@ -603,7 +580,6 @@ namespace db {
         std::string str = trimStr(condStr);
         if (str.empty()) return result;
 
-        // 顶层分割 && (M.U.G.E.N 逻辑 AND)
         {
             int depth = 0;
             size_t start = 0;
@@ -623,34 +599,29 @@ namespace db {
             }
         }
 
-        // 检查是否有 NOT (!)
         bool negated = false;
         if (str[0] == '!') {
             negated = true;
             str = trimStr(str.substr(1));
         }
 
-        // 去掉整个表达式的外层括号: "(statetype = a)" → "statetype = a"
         while (str.size() >= 2 && str.front() == '(' && str.back() == ')') {
             str = trimStr(str.substr(1, str.size() - 2));
         }
 
-        // 简单布尔条件 (无操作符)
         std::string lower = str;
         std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
 
         Condition cond;
         cond.negated = negated;
 
-        // 先检查是否有比较操作符
         std::string opStr;
         size_t opPos = std::string::npos;
 
-        // 查找操作符位置
         for (const auto& opC : {"<=", ">=", "!=", "=", "<", ">"}) {
             size_t pos = str.find(opC);
             if (pos != std::string::npos) {
-                // 确保 opC 不是被引号括起来的
+
                 bool inQuote = false;
                 for (size_t i = 0; i < pos; i++) {
                     if (str[i] == '"') inQuote = !inQuote;
@@ -665,19 +636,17 @@ namespace db {
 
         if (opPos != std::string::npos) {
             std::string lhs = trimStr(str.substr(0, opPos));
-            // 去掉括号 (M.U.G.E.N 允许 (statetype = s))
+
             while (lhs.size() >= 2 && lhs.front() == '(' && lhs.back() == ')') {
                 lhs = trimStr(lhs.substr(1, lhs.size() - 2));
             }
             std::string opPart = opStr;
             std::string rhs = trimStr(str.substr(opPos + opStr.size()));
 
-            // 去掉引号
             if (rhs.size() >= 2 && rhs[0] == '"' && rhs.back() == '"') {
                 rhs = rhs.substr(1, rhs.size() - 2);
             }
 
-            // 如果 rhs 是字符串 (带引号) 或者无法转换为数字
             bool isNumeric = isSimpleNumber(rhs);
 
             cond.op = parseOp(opPart);
@@ -685,7 +654,6 @@ namespace db {
             std::string lhsLower = lhs;
             std::transform(lhsLower.begin(), lhsLower.end(), lhsLower.begin(), ::tolower);
 
-            // === 统一区间语法处理: [low, high] (M.U.G.E.N 1.0 标准) ===
             if (rhs.size() >= 2 && rhs[0] == '[' && rhs.back() == ']') {
                 cond.isRange = true;
                 std::string rangeContent = rhs.substr(1, rhs.size() - 2);
@@ -694,18 +662,17 @@ namespace db {
                     try { cond.rangeLow = std::stoi(rangeContent.substr(0, commaPos)); } catch(...) {}
                     try { cond.rangeHigh = std::stoi(rangeContent.substr(commaPos + 1)); } catch(...) {}
                 } else if (!isSimpleNumber(rangeContent)) {
-                    // [ground.SlideTime] 等表达式: 运行时求值
+
                     cond.rangeExpr = rangeContent;
                 }
                 if (!cond.rangeExpr.empty()) {
-                    rhs = "0"; // 占位, 运行时由 evaluate 处理
+                    rhs = "0";
                 } else {
-                    // 区间条件下，所有 stoi/stof 都用 rangeLow 替代，防止异常
+
                     rhs = std::to_string(cond.rangeLow);
                 }
             }
 
-            // 匹配左侧的变量名
             if (lhsLower == "time") {
                 cond.type = CondType::TIME;
                 try { cond.rhsInt = std::stoi(rhs); } catch(...) { cond.rhsInt = 0; }
@@ -793,7 +760,7 @@ namespace db {
             }
             else if (lhsLower.find("gethitvar") != std::string::npos) {
                 cond.type = CondType::GETHITVAR;
-                // 从 LHS 中提取参数名: "GetHitVar(yvel)" → "yvel"
+
                 size_t parenL = lhs.find('(');
                 size_t parenR = lhs.find(')');
                 if (parenL != std::string::npos && parenR != std::string::npos && parenR > parenL) {
@@ -807,7 +774,7 @@ namespace db {
             }
             else if (lhsLower == "timemod") {
                 cond.type = CondType::TIMEMOD;
-                // timemod = N,M 格式
+
                 size_t comma = rhs.find(',');
                 if (comma != std::string::npos) {
                     try { cond.rhsInt = std::stoi(rhs.substr(0, comma)); } catch(...) { cond.rhsInt = 0; }
@@ -870,15 +837,15 @@ namespace db {
                 try { cond.rhsInt = std::stoi(rhs); } catch(...) { cond.rhsInt = 0; }
             }
             else if (lhsLower.find("ifelse") != std::string::npos) {
-                // ifelse 在 CNS 中作为函数参数使用，这里简化处理
+
                 cond.type = CondType::LITERAL_TRUE;
             }
             else {
-                // 未知条件，默认为 true
+
                 cond.type = CondType::LITERAL_TRUE;
             }
         } else {
-            // 无操作符 — 布尔条件
+
             cond.op = CondOp::NONE;
 
             if (lower == "ctrl")                cond.type = CondType::CTRL;
@@ -894,11 +861,11 @@ namespace db {
             else if (lower == "hitfall")        cond.type = CondType::HITFALL;
             else if (lower == "1" || lower == "true") cond.type = CondType::LITERAL_TRUE;
             else {
-                // 可能是一个数字常量 (如 1)
+
                 if (isSimpleNumber(lower)) {
                     cond.type = CondType::LITERAL_TRUE;
                 } else {
-                    cond.type = CondType::LITERAL_TRUE; // 默认为 true
+                    cond.type = CondType::LITERAL_TRUE;
                 }
             }
         }
@@ -907,12 +874,6 @@ namespace db {
         return result;
     }
 
-    // ==========================================
-    // 具体控制器实现
-    // ==========================================
-
-    // 前向声明: 简易 CNS 表达式求值
-    // --- ChangeState ---
     ChangeStateController::ChangeStateController() {
         type = ControllerType::CHANGESTATE;
     }
@@ -924,16 +885,12 @@ namespace db {
         fighter.requestStateChange(targetState);
     }
 
-    // --- ChangeAnim ---
-    // 简易 CNS 表达式求值: 支持 ifelse(), GetHitVar(), statetype, 数字, +, *, p2dist
     int evaluateCNSExpression(const std::string& expr, const Fighter& fighter);
 
-    // 辅助: 判断布尔条件并返回 0 或 1
     static int evaluateCNSBool(const std::string& cond, const Fighter& fighter) {
         std::string s = trimStr(cond);
         if (s.empty()) return 0;
 
-        // 处理 || (OR) — 在顶层深度=0 时分割
         {
             int depth = 0;
             for (size_t i = 0; i < s.size(); i++) {
@@ -946,7 +903,6 @@ namespace db {
             }
         }
 
-        // 处理 && (AND) — 在顶层深度=0 时分割
         {
             int depth = 0;
             for (size_t i = 0; i < s.size(); i++) {
@@ -959,7 +915,6 @@ namespace db {
             }
         }
 
-        // 去掉外层匹配括号 (检查是否真的是匹配的一对)
         while (s.size() >= 2 && s.front() == '(' && s.back() == ')') {
             int depth = 0;
             bool properPair = true;
@@ -976,7 +931,6 @@ namespace db {
         std::string lower = s;
         std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
 
-        // 纯布尔变量
         if (lower == "ctrl")        return fighter.hasControl() ? 1 : 0;
         if (lower == "movecontact") return fighter.hasMoveContact() ? 1 : 0;
         if (lower == "movehit")     return fighter.hasMoveHit() ? 1 : 0;
@@ -985,7 +939,6 @@ namespace db {
         if (lower == "hitover")     return fighter.isHitOver() ? 1 : 0;
         if (lower == "hitshakeover") return fighter.isHitShakeOver() ? 1 : 0;
 
-        // 包含比较操作符: "statetype = C", "command != holddown"
         for (const auto& opC : {"!=", "=", "<=", ">=", "<", ">"}) {
             size_t opPos = s.find(opC);
             if (opPos != std::string::npos) {
@@ -995,7 +948,7 @@ namespace db {
                 std::transform(lhsLower.begin(), lhsLower.end(), lhsLower.begin(), ::tolower);
                 std::string rhsLower = rhs;
                 std::transform(rhsLower.begin(), rhsLower.end(), rhsLower.begin(), ::tolower);
-                // 去掉 rhs 引号
+
                 if (rhs.size() >= 2 && rhs[0] == '"' && rhs.back() == '"') {
                     rhs = rhs.substr(1, rhs.size() - 2);
                     rhsLower = rhs;
@@ -1007,7 +960,6 @@ namespace db {
                 bool result = false;
                 std::string opStr = opC;
 
-                // 处理 [low,high] 范围语法: "anim = [5051,5059]"
                 if (rhs.size() >= 2 && rhs[0] == '[' && rhs.back() == ']') {
                     std::string rangeContent = rhs.substr(1, rhs.size() - 2);
                     size_t commaPos = rangeContent.find(',');
@@ -1017,13 +969,13 @@ namespace db {
                         bool inRange = (lhsVal >= rangeLow && lhsVal <= rangeHigh);
                         if (opStr == "=")  result = inRange;
                         else if (opStr == "!=") result = !inRange;
-                        else result = (lhsVal == rangeLow); // fallback
+                        else result = (lhsVal == rangeLow);
                         return result ? 1 : 0;
                     }
                 }
 
                 if (lhsLower == "statetype") {
-                    int st = fighter.getStateType(); // 0=S, 1=C, 2=A
+                    int st = fighter.getStateType();
                     if (rhsLower == "s") rhsVal = 0;
                     else if (rhsLower == "c") rhsVal = 1;
                     else if (rhsLower == "a") rhsVal = 2;
@@ -1040,27 +992,23 @@ namespace db {
             }
         }
 
-        // 纯数字
         try { return std::stoi(s); } catch (...) {}
         return 0;
     }
 
-    // 辅助: 解析单个因子 (数字, GetHitVar, ifelse, 或括号表达式)
     static int evaluateCNSFactor(const std::string& factor, const Fighter& fighter) {
         std::string s = trimStr(factor);
         if (s.empty()) return 0;
 
-        // 前面有 ! 号
         bool negated = false;
         if (s[0] == '!') {
             negated = true;
             s = trimStr(s.substr(1));
         }
 
-        // 去掉外层括号 → 数值或布尔表达式
         if (s.size() >= 2 && s.front() == '(' && s.back() == ')') {
             std::string inner = trimStr(s.substr(1, s.size() - 2));
-            // 如果内部含比较操作符 → 布尔求值; 否则 → 数值求值
+
             bool isComparison = false;
             for (const auto& op : {"!=", "=", "<=", ">=", "<", ">"}) {
                 if (inner.find(op) != std::string::npos) { isComparison = true; break; }
@@ -1074,7 +1022,6 @@ namespace db {
             }
         }
 
-        // ifelse(cond, trueVal, falseVal)
         size_t ifelsePos = s.find("ifelse");
         if (ifelsePos != std::string::npos) {
             size_t parenL = s.find('(', ifelsePos);
@@ -1102,7 +1049,6 @@ namespace db {
             }
         }
 
-        // GetHitVar(name)
         size_t ghvPos = s.find("GetHitVar");
         if (ghvPos != std::string::npos) {
             size_t parenL = s.find('(', ghvPos);
@@ -1114,16 +1060,14 @@ namespace db {
             }
         }
 
-        // statetype 关键字 → 返回数值
         {
             std::string lower = s;
             std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
             if (lower == "statetype") {
-                return fighter.getStateType(); // 0=S, 1=C, 2=A
+                return fighter.getStateType();
             }
         }
 
-        // anim 关键字 → 当前动画 ID
         {
             std::string lower = s;
             std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
@@ -1132,7 +1076,6 @@ namespace db {
             }
         }
 
-        // p2dist x / p2dist y → 到对手的距离
         {
             std::string lower = s;
             std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
@@ -1148,7 +1091,6 @@ namespace db {
             }
         }
 
-        // const(path) → 查找速度/运动常量 (返回 raw px/tick)
         {
             std::string lower = s;
             std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
@@ -1160,7 +1102,6 @@ namespace db {
             }
         }
 
-        // 数字
         try {
             int val = std::stoi(s);
             return negated ? -val : val;
@@ -1168,12 +1109,10 @@ namespace db {
         return 0;
     }
 
-    // 主表达式求值: 处理 + 和 *
     int evaluateCNSExpression(const std::string& expr, const Fighter& fighter) {
         std::string s = trimStr(expr);
         if (s.empty()) return 0;
 
-        // 先按 + 分割
         int total = 0;
         size_t start = 0;
         int depth = 0;
@@ -1186,7 +1125,7 @@ namespace db {
             }
         }
         if (start == 0) {
-            // 没有 +: 按 * 分割
+
             total = 1;
             size_t mulStart = 0;
             for (size_t i = 0; i < s.size(); i++) {
@@ -1199,7 +1138,7 @@ namespace db {
             }
             total *= evaluateCNSFactor(s.substr(mulStart), fighter);
         } else {
-            // 有 +: 递归处理剩余部分
+
             total += evaluateCNSExpression(s.substr(start), fighter);
         }
         return total;
@@ -1218,7 +1157,6 @@ namespace db {
         }
     }
 
-    // --- VelSet ---
     VelSetController::VelSetController() {
         type = ControllerType::VELSET;
     }
@@ -1228,7 +1166,7 @@ namespace db {
             if (!valueXStr.empty()) {
                 vx = static_cast<float>(evaluateCNSExpression(valueXStr, fighter));
             }
-            // M.U.G.E.N: 正X=向前，面朝左时翻转
+
             if (!fighter.isFacingRight()) { vx = -vx; }
             fighter.setVelocityX(vx * 60.f);
         }
@@ -1237,11 +1175,10 @@ namespace db {
             if (!valueYStr.empty()) {
                 vy = static_cast<float>(evaluateCNSExpression(valueYStr, fighter));
             }
-            fighter.setVelocityY(vy * 60.f);  // px/tick → px/s
+            fighter.setVelocityY(vy * 60.f);
         }
     }
 
-    // --- VelAdd ---
     VelAddController::VelAddController() {
         type = ControllerType::VELADD;
     }
@@ -1255,13 +1192,10 @@ namespace db {
         if (!valueYStr.empty()) {
             addY = static_cast<float>(evaluateCNSExpression(valueYStr, fighter));
         }
-        // 注意: GetHitVar(yaccel) 已经预乘以 60 (返回 26 ≈ 0.44*60),
-        // 所以这里不做 ×60 转换，直接加。
-        // 对于字面值 y = N (在 px/tick 单位), 需要调用方自行 ×60。
+
         fighter.addVelocity(addX, addY);
     }
 
-    // --- VelMul ---
     VelMulController::VelMulController() {
         type = ControllerType::VELMUL;
     }
@@ -1272,17 +1206,14 @@ namespace db {
         fighter.setVelocityY(vy);
     }
 
-    // --- StateTypeSet ---
     StateTypeSetController::StateTypeSetController() {
         type = ControllerType::STATETYPESET;
     }
     void StateTypeSetController::execute(Fighter& fighter, InputManager* inputMgr, float dt) const {
-        // statetype/physics/movetype 通过 paramStr 设置
-        // 格式: "statetype = S" 或 "physics = N" 等
+
         fighter.setStateType(value);
     }
 
-    // --- CtrlSet ---
     CtrlSetController::CtrlSetController() {
         type = ControllerType::CTRLSET;
     }
@@ -1290,7 +1221,6 @@ namespace db {
         fighter.setControl(value != 0);
     }
 
-    // --- PosSet ---
     PosSetController::PosSetController() {
         type = ControllerType::POSSET;
     }
@@ -1302,7 +1232,6 @@ namespace db {
         fighter.setPosition(fighter.getPosition().x + setX, fighter.getPosition().y + setY);
     }
 
-    // --- PosAdd ---
     PosAddController::PosAddController() {
         type = ControllerType::POSADD;
     }
@@ -1324,7 +1253,6 @@ namespace db {
         fighter.addPositionY(addY);
     }
 
-    // --- PowerAdd ---
     PowerAddController::PowerAddController() {
         type = ControllerType::POWERADD;
     }
@@ -1332,26 +1260,20 @@ namespace db {
         fighter.addPower(value);
     }
 
-    // --- PlaySnd ---
     PlaySndController::PlaySndController() {
         type = ControllerType::PLAYSND;
     }
     void PlaySndController::execute(Fighter& fighter, InputManager* inputMgr, float dt) const {
-        // 播放音效 (简化: 只打印日志)
-        // value = sndGroup, paramInt = sndIndex
-        // std::cout << "[PlaySnd] Group: " << value << ", Index: " << paramInt << std::endl;
+
     }
 
-    // --- HitDef ---
     HitDefController::HitDefController() {
         type = ControllerType::HITDEF;
     }
     void HitDefController::execute(Fighter& fighter, InputManager* inputMgr, float dt) const {
-        // HitDef 由 Game::checkCombat() 处理, 这里不需要做任何事
-        // 触发条件由 trigger 系统管理
+
     }
 
-    // --- VarSet ---
     VarSetController::VarSetController() {
         type = ControllerType::VARSET;
     }
@@ -1365,7 +1287,6 @@ namespace db {
         }
     }
 
-    // --- VarAdd ---
     VarAddController::VarAddController() {
         type = ControllerType::VARADD;
     }
@@ -1379,26 +1300,23 @@ namespace db {
         }
     }
 
-    // --- NotHitBy ---
     NotHitByController::NotHitByController() {
         type = ControllerType::NOTHITBY;
     }
     void NotHitByController::execute(Fighter& fighter, InputManager* inputMgr, float dt) const {
-        // 设置不可命中状态
+
         fighter.setNotHitBy(valueStr);
     }
 
-    // --- Turn ---
     TurnController::TurnController() {
         type = ControllerType::TURN;
     }
     void TurnController::execute(Fighter& fighter, InputManager* inputMgr, float dt) const {
-        // M.U.G.E.N: Turn 是"面向对手"而不是"翻转方向"
+
         sf::Vector2f oppPos = fighter.getOpponentPos();
         fighter.setFacingRight(oppPos.x > fighter.getPosition().x);
     }
 
-    // --- SelfState ---
     SelfStateController::SelfStateController() {
         type = ControllerType::SELFSTATE;
     }
@@ -1406,17 +1324,13 @@ namespace db {
         fighter.requestStateChange(value);
     }
 
-    // --- Null ---
     NullController::NullController() {
         type = ControllerType::NULL_CTRL;
     }
     void NullController::execute(Fighter& fighter, InputManager* inputMgr, float dt) const {
-        // 什么都不做
+
     }
 
-    // ==========================================
-    // EnvShakeController
-    // ==========================================
     EnvShakeController::EnvShakeController() {
         type = ControllerType::ENVSHAKE;
     }
@@ -1433,23 +1347,17 @@ namespace db {
         fighter.setShake(m_shakeTime, m_shakeAmpl);
     }
 
-    // ==========================================
-    // FallEnvShakeController
-    // ==========================================
     FallEnvShakeController::FallEnvShakeController() {
         type = ControllerType::FALLENVSHAKE;
     }
     void FallEnvShakeController::execute(Fighter& fighter, InputManager* inputMgr, float dt) const {
-        // 使用命中信息中的 envshakeTime
+
         int time = fighter.getHitInfo().envshakeTime;
         if (time > 0) {
-            fighter.setShake(time, 4);  // 默认振幅 4
+            fighter.setShake(time, 4);
         }
     }
 
-    // ==========================================
-    // ExplodController
-    // ==========================================
     ExplodController::ExplodController() {
         type = ControllerType::EXPLOD;
     }
@@ -1509,17 +1417,13 @@ namespace db {
         explod.removeOnGetHit = m_removeOnGetHit;
         explod.pos = {m_posX, m_posY};
         explod.vel = {m_velX, m_velY};
-        explod.facing = m_facing;  // 1=same as parent, -1=opposite
+        explod.facing = m_facing;
 
-        // facing: 1 means same direction as parent
         bool parentFacing = fighter.isFacingRight();
         explod.animPlayer.setFacingRight(explod.facing == 1 ? parentFacing : !parentFacing);
 
-        // Scale (from CNS, default 1,1)
         explod.animPlayer.setScale(m_scaleX, m_scaleY);
 
-        // Explod 位置 = fighter 轴位置 + CNS pos 偏移
-        // draw() 会自动处理精灵轴对齐 (axisX/axisY + scale)
         sf::Vector2f fPos = fighter.getPosition();
         float dir = parentFacing ? 1.f : -1.f;
 
@@ -1536,9 +1440,6 @@ namespace db {
         fighter.addExplod(std::move(explod));
     }
 
-    // ==========================================
-    // RemoveExplodController
-    // ==========================================
     RemoveExplodController::RemoveExplodController() {
         type = ControllerType::REMOVEEXPLOD;
     }
@@ -1553,9 +1454,6 @@ namespace db {
         fighter.removeExplod(m_id);
     }
 
-    // ==========================================
-    // HelperController
-    // ==========================================
     HelperController::HelperController() {
         type = ControllerType::HELPER;
     }
@@ -1582,12 +1480,10 @@ namespace db {
     void HelperController::execute(Fighter& fighter, InputManager* inputMgr, float dt) const {
         if (m_stateno <= 0) return;
 
-        // 从 StateDef 查找动画和速度
         int animId = m_stateno;
         float velX = 0.f, velY = 0.f;
         fighter.getStateDefAttributes(m_stateno, animId, velX, velY);
 
-        // 计算初始位置 (相对于父级)
         sf::Vector2f fPos = fighter.getPosition();
         float dir = fighter.isFacingRight() ? 1.f : -1.f;
         sf::Vector2f pos = {fPos.x + m_posX * dir, fPos.y + m_posY};
@@ -1597,14 +1493,11 @@ namespace db {
         ph.animId = animId;
         ph.stateNo = m_stateno;
         ph.position = pos;
-        ph.velocity = {velX, velY};  // px/tick
-        //std::cout << "[HelperCtrl] fire state=" << m_stateno
-        //          << " parentState=" << fighter.getCurrentStateNo()
-        //          << " moveContact=" << fighter.hasMoveContact()
-        //          << " moveHit=" << fighter.hasMoveHit() << std::endl;
+        ph.velocity = {velX, velY};
+
         ph.facingRight = (m_facing == 1) ? fighter.isFacingRight() : !fighter.isFacingRight();
         ph.parentStateno = fighter.getCurrentStateNo();
-        // 从攻击者的 HitDef 取伤害和火花
+
         const auto& hitDefs = fighter.getCurrentHitDefs();
         if (!hitDefs.empty()) {
             ph.damage = hitDefs[0].damage;
@@ -1613,9 +1506,6 @@ namespace db {
         fighter.addPendingHelper(ph);
     }
 
-    // ==========================================
-    // AfterImageController
-    // ==========================================
     AfterImageController::AfterImageController() {
         type = ControllerType::AFTERIMAGE;
     }
@@ -1636,12 +1526,9 @@ namespace db {
         fighter.setAfterImage(m_time, m_timegap, m_length);
     }
 
-    // ==========================================
-    // SuperPauseController
-    // ==========================================
     SuperPauseController::SuperPauseController() {
         type = ControllerType::SUPERPAUSE;
-        persistent = 0;  // 每局只触发一次 (防止 AnimElem=1 暂停结束后重复触发)
+        persistent = 0;
     }
     void SuperPauseController::parse(const std::string& key, const std::string& value) {
         std::string lowerKey = key;
@@ -1659,16 +1546,12 @@ namespace db {
         }
     }
     void SuperPauseController::execute(Fighter& fighter, InputManager* inputMgr, float dt) const {
-        // SuperPause 效果由 Game 层处理
-        // 防止重复触发 (AnimElem=1 在动画冻结时永远为 true)
+
         if (!fighter.isInSuperPause()) {
             fighter.setSuperPause(m_time, m_darken != 0);
         }
     }
 
-    // ==========================================
-    // BindToRootController
-    // ==========================================
     BindToRootController::BindToRootController() {
         type = ControllerType::BIND_TO_ROOT;
     }
@@ -1684,17 +1567,11 @@ namespace db {
         }
     }
 
-    // ==========================================
-    // DestroySelfController (Helper 自毁)
-    // ==========================================
     DestroySelfController::DestroySelfController() {
         type = ControllerType::DESTROY_SELF;
     }
     void DestroySelfController::parse(const std::string& key, const std::string& value) {}
 
-    // ==========================================
-    // VarRangeSetController
-    // ==========================================
     VarRangeSetController::VarRangeSetController() {
         type = ControllerType::VARRANGESET;
     }
@@ -1706,13 +1583,10 @@ namespace db {
         }
     }
     void VarRangeSetController::execute(Fighter& fighter, InputManager* inputMgr, float dt) const {
-        // 清空所有 sysvar (0-59)
+
         for (int i = 0; i < 60; i++) fighter.setSysVar(i, m_value);
     }
 
-    // ==========================================
-    // AssertSpecialController
-    // ==========================================
     AssertSpecialController::AssertSpecialController() {
         type = ControllerType::ASSERTSPECIAL;
     }
@@ -1733,9 +1607,6 @@ namespace db {
         }
     }
 
-    // ==========================================
-    // AngleDrawController
-    // ==========================================
     AngleDrawController::AngleDrawController() {
         type = ControllerType::ANGLEDRAW;
     }
@@ -1751,9 +1622,6 @@ namespace db {
         }
     }
 
-    // ==========================================
-    // TransController
-    // ==========================================
     TransController::TransController() {
         type = ControllerType::TRANS;
     }
@@ -1768,7 +1636,7 @@ namespace db {
             if (comma != std::string::npos) {
                 std::string srcStr = value.substr(0, comma);
                 std::string dstStr = value.substr(comma + 1);
-                // 尝试解析为纯数字，失败则存为表达式
+
                 try {
                     size_t pos = 0;
                     m_alphaSrc = std::stoi(srcStr, &pos);
@@ -1784,7 +1652,7 @@ namespace db {
     }
     void TransController::execute(Fighter& fighter, InputManager* inputMgr, float dt) const {
         auto& overrides = fighter.getDrawOverrides();
-        // 仅设置 alpha 透明度，不使用 additive 混合（与 Explod 一致）
+
         int src = std::max(0, std::min(256, m_alphaSrc));
         overrides.alpha = static_cast<uint8_t>((src * 255) / 256);
     }
@@ -1796,9 +1664,6 @@ namespace db {
         overrides.scaleY = m_scaleY;
     }
 
-    // ==========================================
-    // AngleAddController / AngleSetController
-    // ==========================================
     AngleAddController::AngleAddController() { type = ControllerType::ANGLEADD; }
     void AngleAddController::parse(const std::string& key, const std::string& value) {
         if (key == "value") { try { m_angle = std::stof(value); } catch(...) {} }
@@ -1814,9 +1679,6 @@ namespace db {
         fighter.getDrawOverrides().rotation = m_angle;
     }
 
-    // ==========================================
-    // MakeDustController
-    // ==========================================
     MakeDustController::MakeDustController() { type = ControllerType::MAKEDUST; }
     void MakeDustController::parse(const std::string& key, const std::string& value) {
         std::string lowerKey = key;
@@ -1832,33 +1694,29 @@ namespace db {
         }
     }
     void MakeDustController::execute(Fighter& fighter, InputManager* inputMgr, float dt) const {
-        // 创建灰尘粒子 Explod (使用动画 1229 的落地灰尘)
+
         if (fighter.doesAnimExist(1229)) {
             ExplodInstance dust;
             dust.animPlayer.play(*fighter.getAnimation(1229));
             dust.pos = {m_posX, m_posY};
-            dust.sprpriority = -5;  // 低层级, 在角色脚下
-            dust.removetime = -2;    // 动画播完自动移除
-            dust.bindtime = 1;       // 跟随 1 帧
+            dust.sprpriority = -5;
+            dust.removetime = -2;
+            dust.bindtime = 1;
             fighter.addExplod(std::move(dust));
         }
     }
 
-    // ==========================================
-    // PalFXController
-    // ==========================================
     PalFXController::PalFXController() { type = ControllerType::PALFX; }
     void PalFXController::parse(const std::string& key, const std::string& value) {
         std::string lowerKey = key;
         std::transform(lowerKey.begin(), lowerKey.end(), lowerKey.begin(), ::tolower);
         if (lowerKey == "time") { try { m_time = std::stoi(value); } catch(...) {} }
         else if (lowerKey == "add") {
-            // add = 128,128,128
-            // 简化: 只读第一个值
+
             try { m_addR = std::stoi(value); } catch(...) {}
         }
         else if (lowerKey == "mul") {
-            // mul = 256,256,256
+
             try { m_mulR = std::stoi(value); } catch(...) {}
         }
         else if (lowerKey == "sinadd") {
@@ -1869,22 +1727,16 @@ namespace db {
         fighter.setPalFX(m_time, m_addR, m_addG, m_addB);
     }
 
-    // ==========================================
-    // DefenceMulSetController
-    // ==========================================
     DefenceMulSetController::DefenceMulSetController() { type = ControllerType::DEFENCEMULSET; }
     void DefenceMulSetController::execute(Fighter& fighter, InputManager* inputMgr, float dt) const {
         fighter.setDefenceMul(value);
     }
 
-    // ==========================================
-    // HitVelSetController
-    // ==========================================
     HitVelSetController::HitVelSetController() { type = ControllerType::HITVELSET; }
     void HitVelSetController::execute(Fighter& fighter, InputManager* inputMgr, float dt) const {
         const auto& info = fighter.getHitInfo();
-        // M.U.G.E.N: type=S/C 使用地面速度, type=A 使用空中速度
-        bool useAir = (fighter.getStateType() == 2); // A=2
+
+        bool useAir = (fighter.getStateType() == 2);
 
         if (hasX) {
             float vx = (useAir ? info.airVelocityX : info.groundVelocityX) * valueX * 60.f;
@@ -1896,18 +1748,12 @@ namespace db {
         }
     }
 
-    // ==========================================
-    // PosFreezeController
-    // ==========================================
     PosFreezeController::PosFreezeController() { type = ControllerType::POSFREEZE; }
     void PosFreezeController::execute(Fighter& fighter, InputManager* inputMgr, float dt) const {
         fighter.setVelocityX(0.f);
         fighter.setVelocityY(0.f);
     }
 
-    // ==========================================
-    // HitFallDamageController
-    // ==========================================
     HitFallDamageController::HitFallDamageController() { type = ControllerType::HITFALLDAMAGE; }
     void HitFallDamageController::execute(Fighter& fighter, InputManager* inputMgr, float dt) const {
         int fallYVel = fighter.getHitVar("fall.yvel");
@@ -1917,22 +1763,15 @@ namespace db {
         }
     }
 
-    // ==========================================
-    // HitFallVelController
-    // ==========================================
     HitFallVelController::HitFallVelController() { type = ControllerType::HITFALLVEL; }
     void HitFallVelController::execute(Fighter& fighter, InputManager* inputMgr, float dt) const {
         float vy = fighter.getHitInfo().fallyvel * 60.f;
         fighter.setVelocityY(vy);
     }
 
-    // ==========================================
-    // HitFallSetController
-    // ==========================================
     HitFallSetController::HitFallSetController() { type = ControllerType::HITFALLSET; }
     void HitFallSetController::execute(Fighter& fighter, InputManager* inputMgr, float dt) const {
-        // HitFallSet 的 value 来自 CNS 的 value = 1
-        // 目前在 HitInfo 中由 HitDef 的 fall 参数控制
+
     }
 
-} // namespace db
+}

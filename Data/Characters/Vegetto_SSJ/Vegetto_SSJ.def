@@ -1,0 +1,25 @@
+;***************************************************************************;
+;******************* Created in Fighter Factory Ultimate *******************;
+;*******************      http://www.virtualltek.com     *******************;
+;***************************************************************************;
+
+[Info]
+name = "Vegetto_SSJ_ULSW"
+displayname = "Vegetto SSJ"
+versiondate = 13/03/2023
+mugenversion = 1.0
+author = "Sarrib"
+pal.defaults = 1
+
+[Files]
+sprite = Vegetto_SSJ_ULSW.sff
+anim = Vegetto_SSJ_ULSW.air
+sound = Vegetto_SSJ_ULSW.snd
+cmd = Vegetto_SSJ_ULSW.cmd
+cns = Vegetto_SSJ_ULSW.cns
+stcommon = common1.cns
+st = Vegetto_SSJ_ULSW.cns
+
+[Arcade]
+intro.storyboard = 
+ending.storyboard = 

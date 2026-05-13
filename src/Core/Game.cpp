@@ -12,7 +12,6 @@
 
 namespace db {
 
-    // Simple file logging
     static void logMsg(const char* msg) {
         FILE* f = fopen("C:\\Users\\Lenovo\\game_log.txt", "a");
         if (f) {
@@ -30,11 +29,10 @@ namespace db {
         window_.setVerticalSyncEnabled(true);
         window_.setFramerateLimit(60);
         try {
-            // 加载字体
+
             m_bitmapFont.load("Data/UI/fonts/flame_blocky_font/All_Characters");
             m_useBitmapFont = m_bitmapFont.hasLoaded();
 
-            // 加载调试字体
             if (m_debugFont.openFromFile("C:\\Windows\\Fonts\\arial.ttf")) {
                 m_debugText = std::make_unique<sf::Text>(m_debugFont);
                 m_debugText->setCharacterSize(14);
@@ -43,11 +41,9 @@ namespace db {
                 m_debugReady = true;
             }
 
-            // 发现角色和场景
             m_availableChars = discoverCharacters();
             m_availableStages = discoverStages();
 
-            // 加载 UI 贴图
             loadUITextures();
             HUD::loadTextures();
             loadCharacterPortraits();
@@ -94,14 +90,14 @@ namespace db {
                 if (defFile.is_open()) {
                     std::string line;
                     while (std::getline(defFile, line)) {
-                        // .def 中使用 displayname = "Name"
+
                         auto pos = line.find("displayname");
                         if (pos == std::string::npos) pos = line.find("displayname");
                         if (pos != std::string::npos) {
                             auto eq = line.find('=');
                             if (eq != std::string::npos) {
                                 displayName = line.substr(eq + 1);
-                                // 去掉首尾空格和引号
+
                                 displayName.erase(0, displayName.find_first_not_of(" \t\""));
                                 displayName.erase(displayName.find_last_not_of(" \t\"") + 1);
                             }
@@ -132,7 +128,7 @@ namespace db {
                 StageDef sd;
                 sd.name = name;
                 sd.dirPath = stagesDir + name;
-                // 加载战斗背景图 (大图, 800x600)
+
                 if (!sd.background.loadFromFile(bgPath))
                     std::cerr << "[Stage] Failed to load background: " << bgPath << std::endl;
                 stages.push_back(std::move(sd));
@@ -140,7 +136,7 @@ namespace db {
             }
         } catch (...) {}
         if (stages.empty()) {
-            // 默认场景
+
             StageDef sd;
             sd.name = "Arena";
             sd.dirPath = "";
@@ -170,13 +166,12 @@ namespace db {
     }
 
     void Game::loadCharacterPortraits() {
-        // 直接从 AIR 文件读取第一帧的精灵编号，加载对应的 PNG
+
         for (auto& cd : m_availableChars) {
             std::string airPath = "Data/Characters/" + cd.dirName + "/" + cd.dirName + ".air";
             std::ifstream airFile(airPath);
             if (!airFile.is_open()) continue;
 
-            // 找到 [Begin Action 0]
             std::string line;
             bool found = false;
             while (std::getline(airFile, line)) {
@@ -185,16 +180,14 @@ namespace db {
             }
             if (!found) continue;
 
-            // 读取下一行非空非注释行，提取 group,image
             while (std::getline(airFile, line)) {
-                // 去掉 Clsn 行
+
                 if (line.find("Clsn") != std::string::npos || line.find("clsn") != std::string::npos) continue;
-                // 去掉空行和注释
+
                 std::string trimmed = line;
                 trimmed.erase(0, trimmed.find_first_not_of(" \t\r\n"));
                 if (trimmed.empty() || trimmed[0] == ';') continue;
 
-                // 解析 "g,i, x,y, d" 格式
                 std::stringstream ss(trimmed);
                 std::string token;
                 if (!std::getline(ss, token, ',')) continue;
@@ -210,7 +203,7 @@ namespace db {
                         std::cerr << "[Portrait] Failed to create texture from image for " << cd.dirName << std::endl;
                     }
                 }
-                break; // only first frame
+                break;
             }
         }
     }
@@ -238,7 +231,6 @@ namespace db {
             fighter->setGroundLevel(480.0f - offsetY);
         };
 
-        // 加载选中的场景背景
         if (stageChoice >= 0 && stageChoice < static_cast<int>(m_availableStages.size())) {
             m_stageBg = m_availableStages[stageChoice].background;
         }
@@ -260,7 +252,6 @@ namespace db {
         m_hudP2->update(m_dummy->getCurrentLife(), m_dummy->getMaxLife());
         m_hudP2->updatePower(m_dummy->getPower(), m_dummy->getMaxPower());
 
-        // 进入战斗时清除菜单残留的方向输入，防止角色开局自动移动
         inputManager_.reset();
         inputManagerP2_.reset();
 
@@ -303,12 +294,10 @@ namespace db {
         float winW = static_cast<float>(winSize.x);
         float winH = static_cast<float>(winSize.y);
 
-        // UI View (1920x1080) — 铺满全窗口（拉伸适配）
         sf::View uiView(sf::FloatRect({0, 0}, {1920, 1080}));
         uiView.setViewport(sf::FloatRect({0, 0}, {1, 1}));
         m_uiView = uiView;
 
-        // Game View — 铺满全窗口，坐标空间用窗口实际大小
         sf::View gameView(sf::FloatRect({0, 0}, {winW, winH}));
         gameView.setViewport(sf::FloatRect({0, 0}, {1, 1}));
         m_gameView = gameView;
@@ -354,7 +343,7 @@ namespace db {
                     Fighter::setAnimDebug(!Fighter::getAnimDebug());
                     std::cout << "[AnimDebug] " << (Fighter::getAnimDebug() ? "ON" : "OFF") << std::endl;
                 }
-                // Event-based key tracking: prevents quick taps from being missed
+
                 inputManager_.onKeyPressed(key->code);
             }
             if (const auto* key = event->getIf<sf::Event::KeyReleased>()) {
@@ -368,9 +357,8 @@ namespace db {
         if (m_gameState == GameState::SELECT) { updateSelect(dt); return; }
         if (m_gameState == GameState::STAGE_SELECT) { updateStageSelect(dt); return; }
 
-        // 0. 开场动画 (检测进入循环后切到 191 → 0 → FIGHT)
         if (m_gameState == GameState::INTRO) {
-            // 由 CNS State 190 自己控制: ChangeAnim(RoundState=1 时不冻结) → AnimTime=0 → ChangeState 0
+
             if (m_player && m_dummy &&
                 m_player->getCurrentStateNo() == 0 &&
                 m_dummy->getCurrentStateNo() == 0) {
@@ -378,7 +366,7 @@ namespace db {
                 m_roundTimer = 0.f;
                 std::cout << "[FIGHT] Round " << m_roundNumber << std::endl;
             }
-            // 安全兜底: 15 秒强制退出
+
             m_roundTimer += dt;
             if (m_roundTimer > 15.f) {
                 if (m_player) { m_player->requestStateChange(0); }
@@ -390,13 +378,11 @@ namespace db {
             m_roundTimer += dt;
         }
 
-        // HitStop 冻结 (HitShakeOver 由 Fighter::update 基于状态计时器管理)
         if (m_hitStopTimer > 0.0f) {
             m_hitStopTimer -= dt;
             return;
         }
 
-        // 1. SuperPause 检查 (从 Fighter 读取)
         if (m_player && m_player->isInSuperPause()) {
             m_superPauseTimer = m_player->getSuperPauseTime();
             m_superPauseDarken = m_player->getSuperPauseDarken();
@@ -404,23 +390,19 @@ namespace db {
         }
         if (m_superPauseTimer > 0) {
             m_superPauseTimer--;
-            // 动画不更新 (MOVETIME=25, 暂停期间动画和状态都不推进)
+
             return;
         }
         if (m_superPauseTimer == 0) m_superPauseDarken = false;
 
-        // 2. HitStop 冻结逻辑
         if (m_hitStopTimer > 0.0f) {
             m_hitStopTimer -= dt;
             return;
         }
 
-
-        // JPx 锁存：按下后保持 15 帧可见
         if (inputManager_.justPressed('x')) m_debugJpxLatch = 15;
         else if (m_debugJpxLatch > 0) m_debugJpxLatch--;
 
-        // 诊断：进入攻击/踢腿状态时记录所有输入状态
         {
             int ns = m_player ? m_player->getCurrentStateNo() : -1;
             static int lastLoggedState = -1;
@@ -444,22 +426,19 @@ namespace db {
             }
         }
 
-        // 2. P1 更新
         if (m_player) {
             sf::Vector2f dummyPos = m_dummy ? m_dummy->getPosition() : sf::Vector2f(-9999.f, 0.f);
             int oldState = m_player->getCurrentStateNo();
             m_player->update(dt, inputManager_, dummyPos);
-            // 命中检测由 checkCombat() 统一处理 (在 P2 更新之后)
+
             int newState = m_player->getCurrentStateNo();
         }
 
-        // 3. P2 更新
         if (m_dummy) {
             sf::Vector2f playerPos = m_player->getPosition();
             m_dummy->update(dt, inputManagerP2_, playerPos);
         }
 
-        // 3. KO 检测
         if (m_gameState == GameState::FIGHT && m_player && m_dummy) {
             if (m_dummy->getCurrentLife() <= 0) {
                 m_player->setMoveContact(false);
@@ -480,13 +459,13 @@ namespace db {
         }
         if (m_gameState == GameState::KO) {
             m_koTimer -= dt;
-            // KO 期间只更新动画, 冻结其他
+
             if (m_player && m_koTimer > 0.f && m_koTimer < 2.0f) {
                 m_player->getAnimationPlayer().update(dt);
                 m_dummy->getAnimationPlayer().update(dt);
             }
             if (m_koTimer <= 0.f) {
-                // 判断谁赢了这回合
+
                 bool p1KO = (m_player && m_player->getCurrentLife() <= 0);
                 bool p2KO = (m_dummy && m_dummy->getCurrentLife() <= 0);
                 if (p1KO) m_p2RoundsWon++;
@@ -516,11 +495,10 @@ namespace db {
             }
         }
 
-        // 3.25 读取并创建 Helper (飞行道具)
         if (m_player) {
             auto pending = m_player->drainPendingHelpers();
             for (auto& ph : pending) {
-                // 去重: 同父对象同 ID 的 Helper 已存在则跳过
+
                 bool exists = false;
                 for (const auto& existing : m_helpers) {
                     if (existing.id == ph.id && !existing.done && existing.parent == m_player.get()) {
@@ -540,7 +518,7 @@ namespace db {
                 he.velocity = ph.velocity;
                 he.damage = ph.damage;
                 he.sparkno = ph.sparkno;
-                he.stateNo = ph.stateNo;        // Helper 状态号
+                he.stateNo = ph.stateNo;
                 he.stateRegistry = &m_player->getStateRegistry();
                 he.parent = m_player.get();
                 he.parentStateno = ph.parentStateno;
@@ -582,7 +560,6 @@ namespace db {
             }
         }
 
-        // 3.5 更新 HUD
         if (m_hudP1 && m_player) {
             m_hudP1->update(m_player->getCurrentLife(), m_player->getMaxLife());
             m_hudP1->updatePower(m_player->getPower(), m_player->getMaxPower());
@@ -592,36 +569,30 @@ namespace db {
             m_hudP2->updatePower(m_dummy->getPower(), m_dummy->getMaxPower());
         }
 
-        // 4. 战斗检测
         checkCombat();
 
-        // 4.5 战斗检测后再次执行 P1 CNS (捕获 MOVECONTACT 触发的 Helper 等)
         if (m_player && m_player->isAttacking()) {
             m_player->executeCurrentStateCNS(nullptr, dt);
         }
 
-        // 5. 物理碰撞 (推撞) + 场景边界
         handlePushCollision();
         if (m_player) clampFighterToStage(*m_player);
         if (m_dummy) clampFighterToStage(*m_dummy);
 
-        // 6. 更新 Helper (飞行道具 + CNS 执行)
         for (auto& h : m_helpers) {
             h.animPlayer.update(dt);
             h.stateTime += dt;
             bool isFirstUpdate = h.firstUpdate;
-            h.firstUpdate = false;  // 首次更新后清除标记
-            h.drawOverrides = DrawOverrides(); // 重置每帧绘制覆盖
+            h.firstUpdate = false;
+            h.drawOverrides = DrawOverrides();
 
-            // 先移动再执行 CNS (确保碰撞检测在最新位置)
             h.position.x += h.velocity.x * 60.f * dt;
             h.position.y += h.velocity.y * 60.f * dt;
 
-            // 6.1 执行 Helper 的 CNS 状态 (关键控制器)
             if (const auto* stateDef = h.stateRegistry ? h.stateRegistry->getStateDef(h.stateNo) : nullptr) {
                 int ticks = static_cast<int>(h.stateTime * 60.f);
                 for (const auto& ctrl : stateDef->controllers) {
-                    // VELSET: bypass parent TIME check, use helper own timer
+
                     if (ctrl->type == ControllerType::VELSET) {
                         const auto* vc = dynamic_cast<const VelSetController*>(ctrl.get());
                         if (vc && vc->hasX && h.stateTime < 0.02f) {
@@ -629,15 +600,14 @@ namespace db {
                             h.velocity.x = dir * vc->valueX;
                         }
                     }
-                    // 用父 Fighter 检查 trigger (Helper 自身没有 Fighter 状态)
+
                     if (!ctrl->checkTriggers(h.parent ? *h.parent : *(m_player.get()), nullptr, ticks)) continue;
 
-                    // 手动执行关键控制器
                     switch (ctrl->type) {
                         case ControllerType::VELSET: {
                             const auto* vc = dynamic_cast<const VelSetController*>(ctrl.get());
                             if (vc && !vc->hasX && !vc->hasY) break;
-                            // 简化: 直接用 rawValue 设置速度
+
                             if (vc->hasX && h.stateTime < 0.02f) {
                                 float dir = h.facingRight ? 1.f : -1.f;
                                 h.velocity.x = dir * vc->valueX;
@@ -647,7 +617,7 @@ namespace db {
                         case ControllerType::POSADD: {
                             const auto* pc = dynamic_cast<const PosAddController*>(ctrl.get());
                             if (pc) {
-                                // 用父 Fighter 求值表达式 (如 p2dist x)
+
                                 Fighter* refFtr = h.parent ? h.parent : m_player.get();
                                 float addX = pc->valueX;
                                 float addY = pc->valueY;
@@ -680,7 +650,7 @@ namespace db {
                                         if (h.animPlayer.getAnimTime() == c.rhsInt) shouldDie = true;
                                     }
                                     if (c.type == CondType::PARENT_STATENO && c.op == CondOp::NEQ && h.parent) {
-                                        // 使用帧开始时的父状态号 (避免同帧 ChangeState 的干扰)
+
                                         if (h.parent->getFrameStartState() != c.rhsInt) shouldDie = true;
                                     }
                                     if (c.type == CondType::PARENT_STATENO && c.op == CondOp::EQ && h.parent) {
@@ -704,7 +674,7 @@ namespace db {
                             break;
                         }
                         case ControllerType::HITDEF: {
-                            // Helper 的 HitDef (碰撞检测基于最新位置)
+
                             if (h.hitCooldown <= 0 && m_player && m_dummy) {
                                 const auto& hitDefs = h.stateRegistry->getHitDefs(h.stateNo);
                                 if (!hitDefs.empty()) {
@@ -712,11 +682,11 @@ namespace db {
                                         Fighter* target = (h.parent == m_player.get()) ? m_dummy.get() : m_player.get();
                                         sf::FloatRect hurt = target->getActiveHurtbox();
                                         if (hurt.size.x > 0) {
-                                            // 使用 Helper 当前动画帧的 clsn1 作为碰撞框
+
                                             sf::FloatRect hb = {{0, 0}, {0, 0}};
                                             const auto& frame = h.animPlayer.getCurrentFrame();
                                             if (!frame.clsn1.empty()) {
-                                                // 计算所有 clsn1 的包围盒
+
                                                 bool first = true;
                                                 float minX = 0, maxX = 0, minY = 0, maxY = 0;
                                                 float dir = h.facingRight ? 1.f : -1.f;
@@ -741,7 +711,6 @@ namespace db {
                                                 auto hitPos = hb.findIntersection(hurt);
                                                 target->takeDamage(hd.damage);
 
-                                                // 设置 HitInfo (保留原始速度, 击飞在气功波结束后才触发)
                                                 HitInfo hitInfo;
                                                 hitInfo.damage = hd.damage;
                                                 {
@@ -755,10 +724,6 @@ namespace db {
                                                 hitInfo.fall = hd.fall;
                                                 target->setHitInfo(hitInfo);
 
-                                                // 每次命中重新进入受击状态 5000
-                                                // → velset=0,0 冻结目标 + stateTimer 重置
-                                                // → 目标原地硬直, 不击飞
-                                                // → 气功波结束后不再重置, 计时器走到 HitShakeOver 才击飞
                                                 std::string at = hd.animtype;
                                                 std::transform(at.begin(), at.end(), at.begin(), ::tolower);
                                                 int ts = 5000;
@@ -778,7 +743,7 @@ namespace db {
                                                     h.parent->setMoveContact(true);
                                                     h.parent->setMoveHit(true);
                                                 }
-                                                // 应用防御方暂停帧 (pausetime 第二值)
+
                                                 int defenderPause = hd.guardPausetime;
                                                 if (defenderPause > 0) {
                                                     m_hitStopTimer = defenderPause / 60.0f;
@@ -806,7 +771,7 @@ namespace db {
                             const auto* tc = dynamic_cast<const TransController*>(ctrl.get());
                             if (tc) {
                                 int alphaSrc = tc->m_alphaSrc;
-                                // 表达式求值: 替换 time 为状态帧数
+
                                 if (!tc->m_alphaSrcExpr.empty()) {
                                     std::string expr = tc->m_alphaSrcExpr;
                                     std::string timeStr = std::to_string(ticks);
@@ -828,7 +793,6 @@ namespace db {
                 }
             }
 
-            // 超出屏幕 → 移除 (lifetime 由 DestroySelf 控制, 不过期自动删除)
             h.lifetime--;
             if (h.hitCooldown > 0) h.hitCooldown--;
             else h.hasHit = false;
@@ -839,7 +803,6 @@ namespace db {
         m_helpers.erase(std::remove_if(m_helpers.begin(), m_helpers.end(),
             [](const HelperEntity& h) { return h.done; }), m_helpers.end());
 
-        // 7. 更新火花动画
         for (auto& spark : m_sparks) {
             spark.animPlayer.update(dt);
             if (spark.animPlayer.hasJustLooped()) {
@@ -851,7 +814,7 @@ namespace db {
     }
 
     void Game::updateTitle(float dt) {
-        // 按任意键进入选人
+
         if (inputManager_.isKeyJustPressed(sf::Keyboard::Key::J) ||
             inputManager_.isKeyJustPressed(sf::Keyboard::Key::Enter) ||
             inputManager_.isKeyJustPressed(sf::Keyboard::Key::Space) ||
@@ -874,7 +837,6 @@ namespace db {
         int n = static_cast<int>(m_availableChars.size());
         if (n == 0) return;
 
-        // P1 选人 (A/D 切换, J 确认)
         if (m_selectPhase == 0) {
             int prev = m_p1Choice;
             if (inputManager_.isKeyJustPressed(sf::Keyboard::Key::A) ||
@@ -890,7 +852,7 @@ namespace db {
 
             if (inputManager_.isKeyJustPressed(sf::Keyboard::Key::J)) {
                 m_selectPhase = 1;
-                // P2 默认选 P1 没选的角色
+
                 for (int i = 0; i < n; i++) {
                     if (i != m_p1Choice) { m_p2Choice = i; break; }
                 }
@@ -898,7 +860,7 @@ namespace db {
                 std::cout << "[Select] P1 chose " << m_availableChars[m_p1Choice].displayName << std::endl;
             }
         }
-        // P2 选人 (← → 切换, Enter 确认)
+
         else if (m_selectPhase == 1) {
             int prev = m_p2Choice;
             if (inputManager_.isKeyJustPressed(sf::Keyboard::Key::Left)) {
@@ -970,13 +932,12 @@ namespace db {
             }
             return;
         }
-        // Debug: 打印 hitbox 位置
+
         static int cbCount = 0;
         if (++cbCount % 30 == 1) {
             sf::FloatRect hb = m_player->getActiveHitbox();
             sf::FloatRect hr = m_dummy->getActiveHurtbox();
-            //std::cout << "[CB] hitbox=" << hb.position.x << "," << hb.position.y << " " << hb.size.x << "x" << hb.size.y
-            //          << " hurtbox=" << hr.position.x << "," << hr.position.y << " " << hr.size.x << "x" << hr.size.y << std::endl;
+
         }
 
         const auto& hit = hitDefs[0];
@@ -984,7 +945,6 @@ namespace db {
         sf::FloatRect hitBox = m_player->getActiveHitbox();
         sf::FloatRect hurtBox = m_dummy->getActiveHurtbox();
 
-        // 将攻击框偏移到物理移动前的位置 (防止 VelSet 冲过头导致判定落空)
         {
             sf::Vector2f delta = m_player->getPrePhysicsPos() - m_player->getPosition();
             hitBox.position.x += delta.x;
@@ -1021,14 +981,12 @@ namespace db {
         std::cout << "[checkCombat] HIT! state=" << m_player->getCurrentStateNo() << std::endl;
         m_player->setMoveContact(true);
 
-        // 计算命中接触点 (碰撞矩形中心 + sparkxy 偏移)
         sf::Vector2f contactPoint(
             intersection->position.x + intersection->size.x / 2 + static_cast<float>(hit.sparkX),
             intersection->position.y + intersection->size.y / 2 + static_cast<float>(hit.sparkY)
         );
         spawnSpark(hit.sparkno, contactPoint);
 
-        // 如果攻击方有 unguardable 标志, 防御无效
         bool isGuarding = m_dummy->isGuarding() && !(m_player->getAssertFlags() & 4);
         if (isGuarding) {
             m_player->setMoveGuarded(true);
@@ -1046,7 +1004,7 @@ namespace db {
         info.groundHittime = (hit.groundHittime > 0) ? hit.groundHittime : 15;
         info.groundSlidetime = (hit.groundSlidetime > 0) ? hit.groundSlidetime : 15;
         info.airHittime = (hit.airHittime > 0) ? hit.airHittime : 12;
-        // 速度方向按攻击方面向翻转 (负值=击退)
+
         {
             float hitDir = m_player->isFacingRight() ? 1.f : -1.f;
             info.groundVelocityX = hit.groundVelocityX * hitDir;
@@ -1091,10 +1049,6 @@ namespace db {
             }
             m_dummy->requestStateChange(targetState);
 
-            // 击退速度由受击状态的 HitVelSet 控制器负责 (M.U.G.E.N 标准)
-            // 不在 checkCombat 中设置
-
-            // P1STATENO: 攻击方命中后强制跳转状态 (连段链)
             if (info.p1stateno > 0) {
                 std::cout << "[Combo] p1stateno=" << info.p1stateno
                           << " playerState=" << m_player->getCurrentStateNo() << std::endl;
@@ -1116,7 +1070,6 @@ namespace db {
     void Game::handlePushCollision() {
         if (!m_player || !m_dummy) return;
 
-        // M.U.G.E.N 规范: 推撞只对非攻击/非受击状态生效
         if (m_player->getMoveType() != 0 || m_dummy->getMoveType() != 0) return;
 
         sf::FloatRect box1 = m_player->getPushBox();
@@ -1142,7 +1095,7 @@ namespace db {
     }
 
     void Game::clampFighterToStage(Fighter& fighter) {
-        // M.U.G.E.N 标准舞台边界
+
         const float STAGE_LEFT = 0.f;
         const float STAGE_RIGHT = static_cast<float>(m_windowSize.x);
         const float STAGE_TOP = 0.f;
@@ -1159,13 +1112,11 @@ namespace db {
     }
 
     void Game::render() {
-        // UI 画面 (TITLE/SELECT/STAGE_SELECT) — 使用 1920x1080 UI View 直接渲染
+
         if (m_gameState == GameState::TITLE) { renderTitle(); return; }
         if (m_gameState == GameState::SELECT) { renderSelect(); return; }
         if (m_gameState == GameState::STAGE_SELECT) { renderStageSelect(); return; }
 
-        // 战斗场景 (FIGHT/INTRO/KO)
-        // 画面震动 (EnvShake)
         sf::View shakeView = m_gameView;
         int totalShakeAmpl = 0;
         if (m_player && m_player->getShakeAmpl() > 0) totalShakeAmpl = m_player->getShakeAmpl();
@@ -1178,107 +1129,6 @@ namespace db {
         window_.setView(shakeView);
         window_.clear(sf::Color(30, 30, 50));
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        // 战斗场景背景
         if (m_stageBg.getSize().x > 0 && (m_gameState == GameState::FIGHT || m_gameState == GameState::INTRO || m_gameState == GameState::KO)) {
             sf::Sprite stageSpr(m_stageBg);
             float sx = static_cast<float>(m_windowSize.x) / m_stageBg.getSize().x;
@@ -1287,7 +1137,6 @@ namespace db {
             window_.draw(stageSpr);
         }
 
-        // Helper 按 sprpriority 排序 (让低优先级的画在底层)
         std::vector<const HelperEntity*> sortedHelpers;
         sortedHelpers.reserve(m_helpers.size());
         for (const auto& h : m_helpers) sortedHelpers.push_back(&h);
@@ -1302,19 +1151,16 @@ namespace db {
         if (m_player) m_player->draw(window_);
         if (m_dummy) m_dummy->draw(window_);
 
-        // 调试碰撞框 (始终在最上层)
         if (m_debugReady) {
             if (m_player) m_player->drawDebug(window_);
             if (m_dummy) m_dummy->drawDebug(window_);
         }
 
-        // HUD 用游戏视图 (与战斗场景坐标一致)
         window_.setView(m_gameView);
         if (m_hudP2) m_hudP2->setPosition(static_cast<float>(m_windowSize.x) - 10.0f, 10.0f);
         if (m_hudP1) m_hudP1->draw(window_);
         if (m_hudP2) m_hudP2->draw(window_);
 
-        // 计时器
         if (m_gameState == GameState::FIGHT) {
             int remaining = std::max(0, 99 - static_cast<int>(m_roundTimer));
             char buf[8];
@@ -1322,14 +1168,12 @@ namespace db {
             m_bitmapFont.drawText(window_, buf, {m_windowSize.x / 2.f + 2.f, 30}, 28, sf::Color::White, {0.5f, 0.5f});
         }
 
-        // 回合信息 (显示在计时器下方)
         if (m_player && (m_gameState == GameState::INTRO || m_gameState == GameState::FIGHT)) {
             char buf[32];
             snprintf(buf, sizeof(buf), "ROUND %d", m_roundNumber);
             m_bitmapFont.drawText(window_, buf, {m_windowSize.x / 2.f, 58}, 24, sf::Color::White, {0.5f, 0.f});
         }
 
-        // 调试信息：显示当前状态、动画ID、命令状态 (按下 F1 切换)
         if (m_debugReady && m_player && Fighter::getShowDebug()) {
             int stateNo = m_player->getCurrentStateNo();
             int animId = m_player->getCurrentAnimId();
@@ -1340,14 +1184,13 @@ namespace db {
             int stateTime = m_player->getStateTime();
 
             char buf[256];
-            // 行1: 状态和动画
+
             snprintf(buf, sizeof(buf),
                 "State:%d Anim:%d Elem:%d Time:%d | Type:%d Move:%d | Ctrl:%d",
                 stateNo, animId, animElem, stateTime, stateType, moveType, ctrl);
             m_debugText->setString(buf);
             window_.draw(*m_debugText);
 
-            // 行2: 按钮按住状态 (H=hold)
             snprintf(buf, sizeof(buf),
                 "Btn Hx:%d Hy:%d Hz:%d Ha:%d Hb:%d Hc:%d",
                 inputManager_.buttonX() ? 1 : 0,
@@ -1363,7 +1206,6 @@ namespace db {
             btnText.setString(buf);
             window_.draw(btnText);
 
-            // 行3: 方向解析 + 刚按下(锁存)
             snprintf(buf, sizeof(buf),
                 "Dir:%d fwd:%d back:%d up:%d down:%d | JPx:%d",
                 static_cast<int>(inputManager_.getDirection()),
@@ -1380,15 +1222,14 @@ namespace db {
             window_.draw(dirText);
         }
 
-        // SuperPause 暗化效果
         if (m_superPauseDarken) {
             sf::RectangleShape dark({static_cast<float>(m_windowSize.x), static_cast<float>(m_windowSize.y)});
-            dark.setFillColor({0, 0, 0, 120});  // 半透明黑
+            dark.setFillColor({0, 0, 0, 120});
             window_.draw(dark);
         }
 
         if (m_player && m_dummy) {
-            // KO 文字
+
             if (m_gameState == GameState::KO) {
                 m_bitmapFont.drawText(window_, "K.O.!", {m_windowSize.x / 2.f, m_windowSize.y / 2.f}, 80, sf::Color::Red, {0.5f, 0.5f});
             }
@@ -1482,7 +1323,6 @@ void Game::renderSelect() {
     drawPortrait(rightIdx, spacing, sideW, sideH);
     drawPortrait(centerIdx, 0, largeW, largeH);
 
-    // 发光框 — 放大包裹当前角色 (预计算尺寸供箭头使用)
     float gScale = 1.f, glowW = 0.f, glowH = 0.f;
     float pad = 60.f;
     if (m_texCursorGlow.getSize().x > 0) {
@@ -1495,7 +1335,6 @@ void Game::renderSelect() {
         window_.draw(glow);
     }
 
-    // P1/P2 标签 — 放在角色框正上方
     float tagScale = 2.f;
     float tagY = centerY - glowH * gScale / 2 - m_texP1Tag.getSize().y * tagScale - 8.f;
     if (m_texP1Tag.getSize().x > 0 && m_selectPhase == 0) {
@@ -1511,7 +1350,6 @@ void Game::renderSelect() {
         window_.draw(tag);
     }
 
-    // 箭头 — 放在选中框两侧
     float frameHalfW = glowW * gScale / 2;
     if (m_texSelectArrowL.getSize().x > 0 && glowW > 0) {
         sf::Sprite arrow(m_texSelectArrowL);
@@ -1524,7 +1362,6 @@ void Game::renderSelect() {
         window_.draw(arrow);
     }
 
-    // 底部提示
     if (m_selectPhase == 0) {
         m_bitmapFont.drawText(window_, "PLAYER 1 - A/D SELECT  J CONFIRM", {960, 980}, 28, sf::Color{180,180,180}, {0.5f, 0.f});
     } else {
@@ -1573,7 +1410,6 @@ void Game::renderStageSelect() {
     drawPreview(rightIdx, spacing, sideW, sideH);
     drawPreview(centerIdx, 0, largeW, largeH);
 
-    // 两侧预览图的选择框
     auto drawFrame = [&](float offsetX, float pw, float ph) {
         if (m_texStageCursor.getSize().x == 0) return;
         sf::Sprite cursor(m_texStageCursor);
@@ -1588,7 +1424,6 @@ void Game::renderStageSelect() {
     drawFrame(-spacing, sideW, sideH);
     drawFrame(spacing, sideW, sideH);
 
-    // 中间选中框
     if (m_texStageCursor.getSize().x > 0) {
         sf::Sprite cursor(m_texStageCursor);
         float cursorScale = std::max((largeW + framePadding) / m_texStageCursor.getSize().x,
@@ -1600,7 +1435,6 @@ void Game::renderStageSelect() {
         window_.draw(cursor);
     }
 
-    // 箭头放在选中框两侧
     if (m_texStageArrowL.getSize().x > 0) {
         sf::Sprite arrow(m_texStageArrowL);
         float frameHalfW = (largeW + framePadding) / 2;
@@ -1617,4 +1451,4 @@ void Game::renderStageSelect() {
     m_bitmapFont.drawText(window_, "LEFT/RIGHT SELECT  ENTER CONFIRM", {960, 980}, 28, sf::Color{180,180,180}, {0.5f, 0.f});
     window_.display();
 }
-} // namespace db
+}

@@ -51,10 +51,6 @@ namespace db {
         const float inset = 2.f;
         const float gap = 2.f;
 
-        // P1: m_x = 左边缘, 向右延伸
-        // P2: m_x = 右边缘, 向左延伸 (scale=-1 翻转后可见区域在 m_x 左边)
-
-        // 1. 先画填充 (在底部)
         if (s_texLifeFill.getSize().x > 0 && m_currentRatio > 0.f) {
             sf::Sprite spr(s_texLifeFill);
             int maxW = static_cast<int>(s_texLifeFill.getSize().x) - static_cast<int>(inset * 2);
@@ -66,7 +62,6 @@ namespace db {
             window.draw(spr);
         }
 
-        // 2. 再画框 (覆盖在填充上)
         if (s_texLifeBg.getSize().x > 0) {
             sf::Sprite spr(s_texLifeBg);
             spr.setScale({dir, 1.f});
@@ -74,7 +69,6 @@ namespace db {
             window.draw(spr);
         }
 
-        // 能量条填充
         if (s_texPowerFill.getSize().x > 0 && m_powerRatio > 0.f) {
             sf::Sprite spr(s_texPowerFill);
             int maxW = static_cast<int>(s_texPowerFill.getSize().x) - static_cast<int>(inset * 2);
@@ -86,7 +80,6 @@ namespace db {
             window.draw(spr);
         }
 
-        // 能量条框
         if (s_texPowerBg.getSize().x > 0) {
             sf::Sprite spr(s_texPowerBg);
             spr.setScale({dir, 1.f});
@@ -94,7 +87,6 @@ namespace db {
             window.draw(spr);
         }
 
-        // 角色头像
         if (m_faceTex && m_faceTex->getSize().x > 0) {
             sf::Sprite face(*m_faceTex);
             float faceSize = 40.f;
@@ -104,7 +96,6 @@ namespace db {
             window.draw(face);
         }
 
-        // 计时器 (根据当前视图宽度居中)
         if (s_texTimer.getSize().x > 0) {
             sf::Sprite timer(s_texTimer);
             float centerX = window.getView().getSize().x / 2.f;
@@ -113,4 +104,4 @@ namespace db {
         }
     }
 
-} // namespace db
+}

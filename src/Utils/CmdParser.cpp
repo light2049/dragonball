@@ -20,7 +20,6 @@ namespace db {
         return r;
     }
 
-    // 方向字符串 → DirInput
     static DirInput strToDir(const std::string& s) {
         std::string u = s;
         std::transform(u.begin(), u.end(), u.begin(), ::toupper);
@@ -35,7 +34,6 @@ namespace db {
         return DirInput::NONE;
     }
 
-    // 方向匹配 (含 facing-relative 和 4-way 容差)
     static bool dirMatches(DirInput actual, const std::string& expected, bool facingRight) {
         DirInput target = strToDir(expected);
         if (actual == target) return true;
@@ -53,7 +51,6 @@ namespace db {
         return false;
     }
 
-    // 方向历史去重压缩: 去除连续重复, 只保留变化点 (从天到近)
     static std::vector<DirInput> compressDirHistory(const InputManager& input, int maxFrames) {
         std::vector<DirInput> hist;
         DirInput last = DirInput::NONE;
@@ -80,12 +77,9 @@ namespace db {
 
         auto finalizeCommand = [&]() {
             if (!current.name.empty()) {
-                // 允许同一命令名有多个模式 (如 recovery 有 x+y, y+z, x+z 等)
-                // 用 name+index 作为 key 会导致查询复杂，这里只覆盖
-                // 更好: 用 vector 存多模式
-                // 我们直接用 name 作 key，已有定义则追加
+
                 if (m_commands.find(current.name) != m_commands.end()) {
-                    // 同一命令已有定义，追加新定义用 name + "_altN"
+
                     int alt = 1;
                     std::string altName;
                     do {
@@ -100,7 +94,7 @@ namespace db {
         };
 
         while (std::getline(file, line)) {
-            // 跳过 BOM
+
             if (line.size() >= 3 && static_cast<unsigned char>(line[0]) == 0xEF &&
                 static_cast<unsigned char>(line[1]) == 0xBB &&
                 static_cast<unsigned char>(line[2]) == 0xBF) {
@@ -111,19 +105,16 @@ namespace db {
             if (start == std::string::npos) continue;
             line = line.substr(start);
 
-            // 注释
             if (line[0] == ';') continue;
 
             std::string lowerLine = toLower(line);
 
-            // [Command] 块开始
             if (lowerLine.starts_with("[command]")) {
                 finalizeCommand();
                 inCommand = true;
                 continue;
             }
 
-            // 其他块结束当前命令解析
             if (line[0] == '[' && line.back() == ']' && !lowerLine.starts_with("[command]")) {
                 finalizeCommand();
                 inCommand = false;
@@ -140,11 +131,11 @@ namespace db {
             std::string lowerKey = toLower(key);
 
             if (lowerKey == "name") {
-                // 去掉尾部分号注释
+
                 size_t semicolon = value.find(';');
                 if (semicolon != std::string::npos) value = value.substr(0, semicolon);
                 value = trim(value);
-                // 去掉引号
+
                 if (value.size() >= 2 && value[0] == '"' && value.back() == '"') {
                     value = value.substr(1, value.size() - 2);
                 }
@@ -168,7 +159,6 @@ namespace db {
         std::string str = trim(cmdStr);
         if (str.empty()) return tokens;
 
-        // 按逗号分割 (方向序列/按键+按键 用逗号分隔)
         std::vector<std::string> parts;
         size_t pos = 0;
         while ((pos = str.find(',')) != std::string::npos) {
@@ -180,7 +170,6 @@ namespace db {
         for (const auto& part : parts) {
             CommandToken token;
 
-            // 检查是否是同时按键 (如 "x+y")
             if (part.find('+') != std::string::npos) {
                 token.type = CommandToken::SIMUL;
                 token.value = part;
@@ -188,21 +177,19 @@ namespace db {
                 continue;
             }
 
-            // 检查是否带 / (hold)
             if (part[0] == '/') {
                 std::string rest = part.substr(1);
-                // 如果后面是 $ 表示 4-way 方向
+
                 if (rest[0] == '$' && rest.size() > 1) {
                     token.type = CommandToken::HOLD_DIR;
                     token.value = rest.substr(1);
                 } else {
-                    // 检查是否是方向键还是按钮
-                    // M.U.G.E.N 规范: 方向大写(F/B/D/U), 按钮小写(a/b/c/x/y/z/s)
+
                     std::string upper = rest;
                     std::transform(upper.begin(), upper.end(), upper.begin(), ::toupper);
                     if ((upper == "F" || upper == "B" || upper == "D" || upper == "U" ||
                          upper == "DF" || upper == "DB" || upper == "UF" || upper == "UB") &&
-                        rest == upper) {  // 只有原字符串是大写时才视为方向
+                        rest == upper) {
                         token.type = CommandToken::HOLD_DIR;
                         token.value = upper;
                     } else {
@@ -214,7 +201,6 @@ namespace db {
                 continue;
             }
 
-            // 检查是否带 $ (4-way 方向)
             if (part[0] == '$' && part.size() > 1) {
                 token.type = CommandToken::DIR;
                 token.value = part.substr(1);
@@ -223,13 +209,12 @@ namespace db {
                 continue;
             }
 
-            // 检查是否带 ~ (释放方向)
             if (part[0] == '~') {
                 std::string rest = part.substr(1);
-                // 可选: ~30 蓄力数字前缀, 先忽略数字部分
+
                 while (!rest.empty() && std::isdigit(rest[0])) rest = rest.substr(1);
                 if (rest.empty()) continue;
-                // 检查 $ 4-way
+
                 if (rest[0] == '$' && rest.size() > 1) {
                     token.type = CommandToken::HOLD_DIR;
                     token.value = rest.substr(1);
@@ -254,13 +239,11 @@ namespace db {
                 continue;
             }
 
-            // 普通方向或按钮
-            // M.U.G.E.N 规范: 方向大写(F/B/D/U), 按钮小写(a/b/c/x/y/z/s)
             std::string upper = part;
             std::transform(upper.begin(), upper.end(), upper.begin(), ::toupper);
             if ((upper == "F" || upper == "B" || upper == "D" || upper == "U" ||
                  upper == "DF" || upper == "DB" || upper == "UF" || upper == "UB") &&
-                part == upper) {  // 只有原字符串是大写时才视为方向
+                part == upper) {
                 token.type = CommandToken::DIR;
                 token.value = upper;
             } else {
@@ -277,15 +260,12 @@ namespace db {
         auto tokens = tokenize(cmd.rawCommand);
         if (tokens.empty()) return false;
 
-        // 特殊情况：双方向轻击 (FF, BB)
-        // "F, F" 格式的 2 个方向 token 序列 → 用双轻击检测
         if (tokens.size() == 2 &&
             tokens[0].type == CommandToken::DIR &&
             tokens[1].type == CommandToken::DIR &&
             tokens[0].value == tokens[1].value) {
             DirInput dir = strToDir(tokens[0].value);
-            // F/B 是相对方向: F=面朝方向(向前), B=面朝反方向(向后)
-            // 需要翻译成物理方向再检查双击
+
             if (tokens[0].value == "F") {
                 dir = facingRight ? DirInput::F : DirInput::B;
                 bool result = input.doubleTap(dir, cmd.time);
@@ -305,12 +285,11 @@ namespace db {
             }
         }
 
-        // 单 token 模式: 直接检查当前状态
         if (tokens.size() == 1) {
             const auto& t = tokens[0];
             switch (t.type) {
                 case CommandToken::BUTTON: {
-                    // M.U.G.E.N 规范: 不带 / 的按钮是"按下检测"(justPressed)
+
                     if (t.value == "x") return input.justPressed('x');
                     if (t.value == "y") return input.justPressed('y');
                     if (t.value == "z") return input.justPressed('z');
@@ -324,8 +303,7 @@ namespace db {
                     return input.isDirHeld(strToDir(t.value));
                 case CommandToken::HOLD_DIR: {
                     DirInput dir = strToDir(t.value);
-                    // 4-way + facing-relative: F = 面朝方向(向前)
-                    // 面向右时 F=F/UF/DF, 面向左时 F=B/UB/DB
+
                     if (t.value == "F") {
                         if (facingRight) return input.isDirHeld(DirInput::F) || input.isDirHeld(DirInput::UF) || input.isDirHeld(DirInput::DF);
                         else return input.isDirHeld(DirInput::B) || input.isDirHeld(DirInput::UB) || input.isDirHeld(DirInput::DB);
@@ -341,7 +319,7 @@ namespace db {
                 case CommandToken::HOLD_BTN:
                     return input.isHeld("hold_" + t.value);
                 case CommandToken::SIMUL: {
-                    // "x+y" → x && y
+
                     std::vector<std::string> btns;
                     std::stringstream ss(t.value);
                     std::string item;
@@ -363,16 +341,14 @@ namespace db {
             }
         }
 
-        // 多 token 模式 (如 "F, x" = 方向F + 按键x)
         if (tokens.size() == 2) {
-            // 模式: [HOLD_DIR/HOLD_BTN/DIR, BUTTON] = 按住 + 按键
+
             bool firstHeld = false;
 
-            // 检查第一个 token
             const auto& t0 = tokens[0];
             switch (t0.type) {
                 case CommandToken::DIR: {
-                    // 检查当前帧 + 历史帧, 4-way + facing-relative
+
                     DirInput targetDir = strToDir(t0.value);
                     auto dirMatch = [&](DirInput d) -> bool {
                         if (d == targetDir) return true;
@@ -401,7 +377,7 @@ namespace db {
                     break;
                 }
                 case CommandToken::HOLD_DIR: {
-                    // 映射方向到 hold 名称
+
                     std::string dirLower = toLower(t0.value);
                     if (dirLower == "f") firstHeld = input.isHeld("holdfwd");
                     else if (dirLower == "b") firstHeld = input.isHeld("holdback");
@@ -426,7 +402,6 @@ namespace db {
 
             if (!firstHeld) return false;
 
-            // 检查第二个 token (通常是按钮)
             const auto& t1 = tokens[1];
             if (t1.type == CommandToken::BUTTON) {
                 return input.justPressed(t1.value[0]);
@@ -435,7 +410,7 @@ namespace db {
                 return input.isDirHeld(strToDir(t1.value));
             }
             if (t1.type == CommandToken::SIMUL) {
-                // 同时按键（如 F 状态下按 x+y）
+
                 std::stringstream ss(t1.value);
                 std::string item;
                 bool allPressed = true;
@@ -450,9 +425,8 @@ namespace db {
             }
         }
 
-        // 多 token 方向序列匹配 (≥3 tokens, 如 ~D,DF,F,a)
         if (tokens.size() >= 3) {
-            // 1. 提取方向 token 和最终按钮
+
             std::vector<const CommandToken*> dirTokens;
             const CommandToken* finalBtn = nullptr;
             for (const auto& t : tokens) {
@@ -467,7 +441,6 @@ namespace db {
 
             int window = std::min(cmd.time, 60);
 
-            // 2. 在时间窗口内找按钮刚按下的帧 (从当前帧往回找)
             int btnFrame = -1;
             auto checkBtnState = [&](const FrameInput& fi) -> bool {
                 if (finalBtn->type == CommandToken::SIMUL) return false;
@@ -489,7 +462,6 @@ namespace db {
                 }
             }
 
-            // 2b. SIMUL 按钮检测
             if (btnFrame < 0 && finalBtn->type == CommandToken::SIMUL) {
                 std::stringstream ss(finalBtn->value);
                 std::string item;
@@ -503,17 +475,14 @@ namespace db {
 
             if (btnFrame < 0) return false;
 
-            // 3. 获取窗口期内完整的方向历史 (从天到近)
             auto dirHist = compressDirHistory(input, window);
 
-            // DEBUG: 有按钮按下时打印
             if (!cmd.name.empty() && cmd.name[0] >= '6' && cmd.name[0] <= '9') {
                 static int dbgFrames = 0;
                 if (++dbgFrames % 60 == 1) {
                 }
             }
 
-            // 4. 在方向历史中搜索命令方向序列
             if (dirHist.size() >= dirTokens.size()) {
                 for (size_t s = 0; s + dirTokens.size() <= dirHist.size(); s++) {
                     bool match = true;
@@ -534,7 +503,7 @@ namespace db {
     }
 
     void CmdParser::evaluate(const InputManager& input, bool facingRight) {
-        // 递减所有缓冲计数
+
         for (auto& [name, frames] : m_buffer) {
             if (frames > 0) frames--;
         }
@@ -543,7 +512,7 @@ namespace db {
         for (const auto& [name, def] : m_commands) {
             bool triggered = evaluateCommand(def, input, facingRight);
             if (triggered) {
-                m_buffer[name] = def.time;  // 触发后缓冲 time 帧
+                m_buffer[name] = def.time;
             }
             m_active[name] = (m_buffer[name] > 0);
         }
@@ -558,9 +527,7 @@ namespace db {
         auto it = m_active.find(name);
         if (it != m_active.end()) return it->second;
 
-        // 对于没有解析过的命令，检查是否是基本命令
-        // (hold_x, holdfwd, x, y 等由 InputManager::isHeld 处理)
         return false;
     }
 
-} // namespace db
+}
