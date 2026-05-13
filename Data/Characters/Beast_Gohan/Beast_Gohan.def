@@ -1,0 +1,18 @@
+[Info]
+name="Beast_Gohan_SWL"
+displayname="Gohan"
+versiondate=1
+mugenversion=1.0
+author="Game Zip"
+pal.defaults=1
+[Files]
+sprite=Beast_Gohan_SWL.sff
+sound=Beast_Gohan_SWL.snd
+anim=Beast_Gohan_SWL.air
+cmd=Beast_Gohan_SWL.cmd
+cns=Beast_Gohan_SWL.cns
+st=Beast_Gohan_SWL.cns
+stcommon=common1.cns
+[Arcade]
+intro.storyboard=
+ending.storyboard=
