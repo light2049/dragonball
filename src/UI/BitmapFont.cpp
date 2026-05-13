@@ -68,7 +68,6 @@ bool BitmapFont::load(const std::string& directory) {
 
         auto tex = std::make_unique<sf::Texture>();
         if (!tex->loadFromFile(path)) {
-            std::cerr << "[BitmapFont] Failed to load: " << filename << std::endl;
             continue;
         }
         m_charTextures[c] = std::move(tex);

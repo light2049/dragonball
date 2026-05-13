@@ -129,8 +129,7 @@ namespace db {
                 sd.name = name;
                 sd.dirPath = stagesDir + name;
 
-                if (!sd.background.loadFromFile(bgPath))
-                    std::cerr << "[Stage] Failed to load background: " << bgPath << std::endl;
+                (void)sd.background.loadFromFile(bgPath);
                 stages.push_back(std::move(sd));
                 std::cout << "[Stage] Found: " << name << std::endl;
             }
@@ -147,9 +146,7 @@ namespace db {
 
     void Game::loadUITextures() {
         auto loadTex = [](sf::Texture& t, const std::string& path) {
-            if (!t.loadFromFile(path)) {
-                std::cerr << "[UI] Failed to load: " << path << std::endl;
-            }
+            (void)t.loadFromFile(path);
         };
         loadTex(m_texTitleBg,       "Data/UI/title/bg.png");
         loadTex(m_texSelectBg,      "Data/UI/select/bg.png");
@@ -199,9 +196,8 @@ namespace db {
 
                 sf::Image img;
                 if (img.loadFromFile(pngPath)) {
-                    if (!cd.portraitLarge.loadFromImage(img) || !cd.portraitSmall.loadFromImage(img)) {
-                        std::cerr << "[Portrait] Failed to create texture from image for " << cd.dirName << std::endl;
-                    }
+                    (void)cd.portraitLarge.loadFromImage(img);
+                    (void)cd.portraitSmall.loadFromImage(img);
                 }
                 break;
             }
@@ -916,28 +912,9 @@ namespace db {
         if (m_player->isHitConsumed()) {
             return;
         }
-        if (m_player->getCurrentStateNo() == 600) {
-            auto pos = m_player->getPosition();
-            std::cout << "[CB600] consumed=" << m_player->isHitConsumed()
-                      << " mh=" << m_player->hasMoveHit()
-                      << " pos=(" << (int)pos.x << "," << (int)pos.y << ")"
-                      << " vy=" << (int)m_player->getVelocityY()
-                      << std::endl;
-        }
         const auto& hitDefs = m_player->getCurrentHitDefs();
-        static int emptyCount = 0;
         if (hitDefs.empty()) {
-            if (++emptyCount % 60 == 1) {
-                std::cout << "[checkCombat] no HitDefs state=" << m_player->getCurrentStateNo() << std::endl;
-            }
             return;
-        }
-
-        static int cbCount = 0;
-        if (++cbCount % 30 == 1) {
-            sf::FloatRect hb = m_player->getActiveHitbox();
-            sf::FloatRect hr = m_dummy->getActiveHurtbox();
-
         }
 
         const auto& hit = hitDefs[0];

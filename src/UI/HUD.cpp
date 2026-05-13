@@ -12,8 +12,7 @@ namespace db {
 
     void HUD::loadTextures() {
         auto load = [](sf::Texture& t, const std::string& path) {
-            if (!t.loadFromFile(path))
-                std::cerr << "[HUD] Failed: " << path << std::endl;
+            t.loadFromFile(path);
         };
         load(s_texLifeBg,   "Data/UI/hud/lifebar_bg.png");
         load(s_texLifeFill, "Data/UI/hud/lifebar_fill.png");
