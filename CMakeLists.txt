@@ -17,6 +17,7 @@ add_executable(DragonBall
         src/Utils/AirParser.cpp
         src/Utils/CnsParser.cpp
         src/UI/HUD.cpp
+        src/UI/BitmapFont.cpp
         src/Characters/Dummy.cpp
         src/Utils/CNSController.cpp
         src/Utils/CmdParser.cpp

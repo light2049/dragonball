@@ -2,6 +2,7 @@
 #include "Characters/Fighter.h"
 #include "Core/InputManager.h"
 #include "UI/HUD.h"
+#include "UI/BitmapFont.h"
 #include <SFML/Graphics.hpp>
 #include <memory>
 #include <vector>
@@ -15,12 +16,11 @@ namespace db {
         bool done = false;
     };
 
-    // ✅ 飞行道具 / 特效实体 (简化版 Helper)
     struct HelperEntity {
         int id = 0;
         AnimationPlayer animPlayer;
         sf::Vector2f position;
-        sf::Vector2f velocity;  // px/tick
+        sf::Vector2f velocity;
         bool facingRight = true;
         int lifetime = 180;
         bool done = false;
@@ -28,17 +28,14 @@ namespace db {
         int sparkno = 1200;
         bool hasHit = false;
         int hitCooldown = 0;
-        int sprpriority = 0;   // 绘制层级
-        // CNS 执行
+        int sprpriority = 0;
         int stateNo = 0;
         float stateTime = 0.f;
         class StateRegistry* stateRegistry = nullptr;
         class Fighter* parent = nullptr;
-        int parentStateno = 0;  // 创建时的父状态, 父状态改变后销毁
-        // 执行过 HitDef 避免一帧多次判定
+        int parentStateno = 0;
         bool hitDefFired = false;
-        bool firstUpdate = true;  // 创建后的首次更新 (跳过 DestroySelf)
-        // 每帧绘制覆盖 (由 AngleDraw / Trans 控制器设置)
+        bool firstUpdate = true;
         DrawOverrides drawOverrides;
     };
 
@@ -52,12 +49,21 @@ namespace db {
         void processEvents();
         void update(float dt);
         void render();
+        void updateTitle(float dt);
+        void updateSelect(float dt);
+        void updateStageSelect(float dt);
+        void renderTitle();
+        void renderSelect();
+        void renderStageSelect();
         void checkCombat();
         void handlePushCollision();
         void clampFighterToStage(Fighter& fighter);
         void spawnSpark(int animId, const sf::Vector2f& pos);
         void resetRound();
         void updateViews(const sf::Vector2u& winSize);
+        void loadUITextures();
+        void loadCharacterPortraits();
+        void loadStagePreviews();
 
         sf::RenderWindow window_;
         sf::Clock clock_;
@@ -76,22 +82,34 @@ namespace db {
 
         float m_hitStopTimer = 0.0f;
         int m_hitStopDuration = 0;
-
-        // SuperPause 状态 (由 CNS SuperPause 控制器触发)
         int m_superPauseTimer = 0;
         bool m_superPauseDarken = false;
+
+        // UI 字体
+        BitmapFont m_bitmapFont;
+        bool m_useBitmapFont = false;
 
         // 角色定义
         struct CharacterDef {
             std::string dirName;
             std::string displayName;
+            sf::Texture portraitSmall;   // 小头像
+            sf::Texture portraitLarge;   // 大立绘
         };
+        struct StageDef {
+            std::string name;
+            std::string dirPath;
+            sf::Texture preview;         // 场景预览图
+            sf::Texture background;      // 战斗背景
+        };
+
         std::vector<CharacterDef> discoverCharacters();
-        void initFight(int p1Choice, int p2Choice);
+        std::vector<StageDef> discoverStages();
+        void initFight(int p1Choice, int p2Choice, int stageChoice);
 
         // 回合系统
-        enum class GameState { SELECT, INTRO, FIGHT, KO };
-        GameState m_gameState = GameState::SELECT;
+        enum class GameState { TITLE, SELECT, STAGE_SELECT, INTRO, FIGHT, KO };
+        GameState m_gameState = GameState::TITLE;
         int m_roundNumber = 1;
         int m_p1RoundsWon = 0;
         int m_p2RoundsWon = 0;
@@ -102,10 +120,36 @@ namespace db {
         std::vector<CharacterDef> m_availableChars;
         int m_p1Choice = 0;
         int m_p2Choice = 0;
-        int m_selectPhase = 0;  // 0=P1选, 1=P2选, 2=准备开始
+        int m_selectPhase = 0;
+        float m_selectAnimPos = 0.f;     // 轮播滑动动画位置
+        float m_selectOffsetY = 150.f;     // 选人角色Y偏移
+        float m_selectSpacing = 710.f;     // 两侧预览图到中心距离
+
+        // 选图界面
+        std::vector<StageDef> m_availableStages;
+        int m_stageChoice = 0;
+        float m_stageAnimPos = 0.f;      // 场景轮播动画
+
+        // UI 贴图
+        sf::Texture m_texTitleBg;
+        sf::Texture m_texSelectBg;
+        sf::Texture m_texSelectArrowL;
+        sf::Texture m_texSelectArrowR;
+        sf::Texture m_texCursorGlow;
+        sf::Texture m_texP1Tag;
+        sf::Texture m_texP2Tag;
+        sf::Texture m_texStageBg;
+        sf::Texture m_texStageArrowL;
+        sf::Texture m_texStageArrowR;
+        sf::Texture m_texStageCursor;
+
+        // 当前选中的场景的战斗背景
+        sf::Texture m_stageBg;
+
+        // 视图
         sf::View m_uiView{sf::FloatRect({0, 0}, {1920, 1080})};
         sf::View m_gameView{sf::FloatRect({0, 0}, {800, 600})};
-        sf::Vector2u m_windowSize{800, 600};
+        sf::Vector2u m_windowSize{960, 540};
         bool m_fullscreen = false;
 
         std::vector<Spark> m_sparks;

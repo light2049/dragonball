@@ -19,54 +19,69 @@ namespace db {
         }
     }
 
-    static bool isKeyDown(sf::Keyboard::Key key) {
-        return sf::Keyboard::isKeyPressed(key);
-    }
-
     void InputManager::onKeyPressed(sf::Keyboard::Key key) {
         int k = static_cast<int>(key);
         if (k >= 0 && k < 128) {
             m_justPressedLatch[k] = true;
+            m_eventKeyState[k] = true;
         }
     }
 
+    void InputManager::onKeyReleased(sf::Keyboard::Key key) {
+        int k = static_cast<int>(key);
+        if (k >= 0 && k < 128) {
+            m_eventKeyState[k] = false;
+        }
+    }
+
+    // 基于事件的按键状态查询 (替代 sf::Keyboard::isKeyPressed 轮询)
+    static bool eventKeyHeld(const bool eventState[128], sf::Keyboard::Key key) {
+        int k = static_cast<int>(key);
+        return k >= 0 && k < 128 && eventState[k];
+    }
+
     void InputManager::update() {
-        // 保存上一帧
         m_previous = m_current;
 
         FrameInput snap;
 
-        // 6键状态
-        snap.x = isKeyDown(mapMugenButton('x'));
-        snap.y = isKeyDown(mapMugenButton('y'));
-        snap.z = isKeyDown(mapMugenButton('z'));
-        snap.a = isKeyDown(mapMugenButton('a'));
-        snap.b = isKeyDown(mapMugenButton('b'));
-        snap.c = isKeyDown(mapMugenButton('c'));
-        snap.s = isKeyDown(mapMugenButton('s'));
+        // 按键状态全部基于事件 (press/release)，不依赖轮询
+        snap.x = eventKeyHeld(m_eventKeyState, mapMugenButton('x'));
+        snap.y = eventKeyHeld(m_eventKeyState, mapMugenButton('y'));
+        snap.z = eventKeyHeld(m_eventKeyState, mapMugenButton('z'));
+        snap.a = eventKeyHeld(m_eventKeyState, mapMugenButton('a'));
+        snap.b = eventKeyHeld(m_eventKeyState, mapMugenButton('b'));
+        snap.c = eventKeyHeld(m_eventKeyState, mapMugenButton('c'));
+        snap.s = eventKeyHeld(m_eventKeyState, mapMugenButton('s'));
 
-        // 蓄气键 (L 键 / hold_s)
-        snap.charge = isKeyDown(sf::Keyboard::Key::L) || snap.s;
+        // 蓄气键
+        snap.charge = eventKeyHeld(m_eventKeyState, sf::Keyboard::Key::L) || snap.s;
 
-        // 方向
+        // 方向同样基于事件
         updateDirection(snap);
 
         m_current = snap;
-
-        // 更新历史
         pushHistory(snap);
-
     }
 
     void InputManager::clearJustPressedLatch() {
         for (int i = 0; i < 128; i++) m_justPressedLatch[i] = false;
     }
 
+    void InputManager::reset() {
+        m_current = FrameInput{};
+        m_previous = FrameInput{};
+        m_history.clear();
+        m_commandResults.clear();
+        clearJustPressedLatch();
+        for (int i = 0; i < 128; i++) m_eventKeyState[i] = false;
+    }
+
     void InputManager::updateDirection(FrameInput& snap) {
-        bool up = isKeyDown(sf::Keyboard::Key::W) || isKeyDown(sf::Keyboard::Key::Up);
-        bool down = isKeyDown(sf::Keyboard::Key::S) || isKeyDown(sf::Keyboard::Key::Down);
-        bool left = isKeyDown(sf::Keyboard::Key::A) || isKeyDown(sf::Keyboard::Key::Left);
-        bool right = isKeyDown(sf::Keyboard::Key::D) || isKeyDown(sf::Keyboard::Key::Right);
+        bool up = eventKeyHeld(m_eventKeyState, sf::Keyboard::Key::W) || eventKeyHeld(m_eventKeyState, sf::Keyboard::Key::Up);
+        bool down = eventKeyHeld(m_eventKeyState, sf::Keyboard::Key::S) || eventKeyHeld(m_eventKeyState, sf::Keyboard::Key::Down);
+        bool left = eventKeyHeld(m_eventKeyState, sf::Keyboard::Key::A) || eventKeyHeld(m_eventKeyState, sf::Keyboard::Key::Left);
+        bool right = eventKeyHeld(m_eventKeyState, sf::Keyboard::Key::D) || eventKeyHeld(m_eventKeyState, sf::Keyboard::Key::Right);
 
         // M.U.G.E.N 8方向判定 (优先级: 斜方向优先)
         if (up && right)       snap.dir = DirInput::UF;

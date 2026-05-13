@@ -41,10 +41,12 @@ namespace db {
     public:
         void update();
 
-        // Event-based key tracking: call from Game::processEvents on KeyPressed
+        // Event-based key tracking: call from Game::processEvents on KeyPressed/KeyReleased
         void onKeyPressed(sf::Keyboard::Key key);
-        // Clear the event latch at start of next frame (before processEvents)
+        void onKeyReleased(sf::Keyboard::Key key);
         void clearJustPressedLatch();
+        // Reset all input state (e.g. on fight start to discard menu input)
+        void reset();
 
         // 单键按下检测 (当前帧按下)
         bool isKeyPressed(sf::Keyboard::Key key) const;
@@ -95,8 +97,9 @@ namespace db {
         std::map<std::string, bool> m_commandResults; // 命令名 → 激活状态 (由 CmdParser 填充)
 
         // Event-based latch: persists for one frame after KeyPressed event
-        // Prevents quick taps from being missed by polling
         bool m_justPressedLatch[128] = {};
+        // Event-based key held state (updated by press/release events, not polling)
+        bool m_eventKeyState[128] = {};
     };
 
 } // namespace db

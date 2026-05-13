@@ -1,11 +1,14 @@
 #include "Core/Game.h"
 #include "Core/ResourceManager.h"
+#include "Utils/CnsParser.h"
 #include <iostream>
 #include <algorithm>
 #include <cstdlib>
 #include <cstdio>
+#include <cmath>
 #include <filesystem>
 #include <fstream>
+#include <sstream>
 
 namespace db {
 
@@ -23,22 +26,36 @@ namespace db {
         }
     }
 
-    Game::Game() : window_(sf::VideoMode({800, 600}), "DragonBall - Phase 6", sf::Style::Resize | sf::Style::Close) {
+    Game::Game() : window_(sf::VideoMode({960, 540}), "DragonBall - Phase 6", sf::Style::Resize | sf::Style::Close) {
         window_.setVerticalSyncEnabled(true);
         window_.setFramerateLimit(60);
         try {
-            m_availableChars = discoverCharacters();
+            // 加载字体
+            m_bitmapFont.load("Data/UI/fonts/flame_blocky_font/All_Characters");
+            m_useBitmapFont = m_bitmapFont.hasLoaded();
 
             // 加载调试字体
             if (m_debugFont.openFromFile("C:\\Windows\\Fonts\\arial.ttf")) {
                 m_debugText = std::make_unique<sf::Text>(m_debugFont);
                 m_debugText->setCharacterSize(14);
-                m_debugText->setFillColor(sf::Color(0, 0, 0));
+                m_debugText->setFillColor(sf::Color(255, 255, 200));
                 m_debugText->setPosition({10.f, 540.f});
                 m_debugReady = true;
             }
 
-            logMsg("Game ready (SELECT screen)\n");
+            // 发现角色和场景
+            m_availableChars = discoverCharacters();
+            m_availableStages = discoverStages();
+
+            // 加载 UI 贴图
+            loadUITextures();
+            HUD::loadTextures();
+            loadCharacterPortraits();
+            loadStagePreviews();
+
+            m_gameState = GameState::TITLE;
+            updateViews({960, 540});
+            logMsg("Game ready (TITLE screen)\n");
 
         } catch (const std::exception& e) {
             std::string err = "Error: ";
@@ -104,7 +121,109 @@ namespace db {
         return chars;
     }
 
-    void Game::initFight(int p1Choice, int p2Choice) {
+    std::vector<Game::StageDef> Game::discoverStages() {
+        std::vector<StageDef> stages;
+        std::string stagesDir = "Data/Stages/";
+        try {
+            for (const auto& entry : std::filesystem::directory_iterator(stagesDir)) {
+                if (!entry.is_directory()) continue;
+                std::string name = entry.path().filename().string();
+                std::string bgPath = stagesDir + name + "/bg.png";
+                StageDef sd;
+                sd.name = name;
+                sd.dirPath = stagesDir + name;
+                // 加载战斗背景图 (大图, 800x600)
+                if (!sd.background.loadFromFile(bgPath))
+                    std::cerr << "[Stage] Failed to load background: " << bgPath << std::endl;
+                stages.push_back(std::move(sd));
+                std::cout << "[Stage] Found: " << name << std::endl;
+            }
+        } catch (...) {}
+        if (stages.empty()) {
+            // 默认场景
+            StageDef sd;
+            sd.name = "Arena";
+            sd.dirPath = "";
+            stages.push_back(std::move(sd));
+        }
+        return stages;
+    }
+
+    void Game::loadUITextures() {
+        auto loadTex = [](sf::Texture& t, const std::string& path) {
+            if (!t.loadFromFile(path)) {
+                std::cerr << "[UI] Failed to load: " << path << std::endl;
+            }
+        };
+        loadTex(m_texTitleBg,       "Data/UI/title/bg.png");
+        loadTex(m_texSelectBg,      "Data/UI/select/bg.png");
+        loadTex(m_texSelectArrowL,  "Data/UI/select/arrow_left_gold_40x60.png");
+        loadTex(m_texSelectArrowR,  "Data/UI/select/arrow_right_gold_40x60.png");
+        loadTex(m_texCursorGlow,    "Data/UI/select/cursor_glow.png");
+        loadTex(m_texP1Tag,         "Data/UI/select/p1_tag.png");
+        loadTex(m_texP2Tag,         "Data/UI/select/p2_tag.png");
+        loadTex(m_texStageBg,       "Data/UI/stage_select/stage_select_bg.png");
+        loadTex(m_texStageArrowL,   "Data/UI/stage_select/arrow_left_simple_40x60.png");
+        loadTex(m_texStageArrowR,   "Data/UI/stage_select/arrow_right_simple_40x60.png");
+        loadTex(m_texStageCursor,   "Data/UI/stage_select/cursor.png");
+        std::cout << "[UI] Loaded textures.\n";
+    }
+
+    void Game::loadCharacterPortraits() {
+        // 直接从 AIR 文件读取第一帧的精灵编号，加载对应的 PNG
+        for (auto& cd : m_availableChars) {
+            std::string airPath = "Data/Characters/" + cd.dirName + "/" + cd.dirName + ".air";
+            std::ifstream airFile(airPath);
+            if (!airFile.is_open()) continue;
+
+            // 找到 [Begin Action 0]
+            std::string line;
+            bool found = false;
+            while (std::getline(airFile, line)) {
+                auto p = line.find("[Begin Action 0]");
+                if (p != std::string::npos) { found = true; break; }
+            }
+            if (!found) continue;
+
+            // 读取下一行非空非注释行，提取 group,image
+            while (std::getline(airFile, line)) {
+                // 去掉 Clsn 行
+                if (line.find("Clsn") != std::string::npos || line.find("clsn") != std::string::npos) continue;
+                // 去掉空行和注释
+                std::string trimmed = line;
+                trimmed.erase(0, trimmed.find_first_not_of(" \t\r\n"));
+                if (trimmed.empty() || trimmed[0] == ';') continue;
+
+                // 解析 "g,i, x,y, d" 格式
+                std::stringstream ss(trimmed);
+                std::string token;
+                if (!std::getline(ss, token, ',')) continue;
+                int group = std::stoi(token);
+                if (!std::getline(ss, token, ',')) continue;
+                int image = std::stoi(token);
+                std::string pngPath = "Data/Characters/" + cd.dirName + "/Sprites/"
+                    + cd.dirName + "_" + std::to_string(group) + "-" + std::to_string(image) + ".png";
+
+                sf::Image img;
+                if (img.loadFromFile(pngPath)) {
+                    if (!cd.portraitLarge.loadFromImage(img) || !cd.portraitSmall.loadFromImage(img)) {
+                        std::cerr << "[Portrait] Failed to create texture from image for " << cd.dirName << std::endl;
+                    }
+                }
+                break; // only first frame
+            }
+        }
+    }
+
+    void Game::loadStagePreviews() {
+        for (auto& sd : m_availableStages) {
+            if (sd.background.getSize().x > 0) {
+                sd.preview = sd.background;
+            }
+        }
+    }
+
+    void Game::initFight(int p1Choice, int p2Choice, int stageChoice) {
         auto loadChar = [&](const std::string& name, std::unique_ptr<Fighter>& fighter, float xPos) {
             fighter = std::make_unique<Fighter>();
             std::string base = "Data/Characters/" + name + "/";
@@ -119,18 +238,31 @@ namespace db {
             fighter->setGroundLevel(480.0f - offsetY);
         };
 
-        loadChar(m_availableChars[p1Choice].dirName, m_player, 200.f);
-        loadChar(m_availableChars[p2Choice].dirName, m_dummy, 600.f);
+        // 加载选中的场景背景
+        if (stageChoice >= 0 && stageChoice < static_cast<int>(m_availableStages.size())) {
+            m_stageBg = m_availableStages[stageChoice].background;
+        }
+
+        float centerX = static_cast<float>(m_windowSize.x) / 2.f;
+        loadChar(m_availableChars[p1Choice].dirName, m_player, centerX - 200.f);
+        loadChar(m_availableChars[p2Choice].dirName, m_dummy, centerX + 200.f);
 
         m_hudP1 = std::make_unique<HUD>();
-        m_hudP1->setPosition(20.0f, 20.0f);
+        m_hudP1->setPosition(10.0f, 10.0f);
+        m_hudP1->setFaceTexture(&m_availableChars[p1Choice].portraitSmall);
         m_hudP1->update(m_player->getCurrentLife(), m_player->getMaxLife());
         m_hudP1->updatePower(m_player->getPower(), m_player->getMaxPower());
 
         m_hudP2 = std::make_unique<HUD>();
-        m_hudP2->setPosition(1600.0f, 20.0f);
+        m_hudP2->setPosition(static_cast<float>(m_windowSize.x) - 10.0f, 10.0f);
+        m_hudP2->setFlipped(true);
+        m_hudP2->setFaceTexture(&m_availableChars[p2Choice].portraitSmall);
         m_hudP2->update(m_dummy->getCurrentLife(), m_dummy->getMaxLife());
         m_hudP2->updatePower(m_dummy->getPower(), m_dummy->getMaxPower());
+
+        // 进入战斗时清除菜单残留的方向输入，防止角色开局自动移动
+        inputManager_.reset();
+        inputManagerP2_.reset();
 
         m_player->setRoundState(1);
         m_dummy->setRoundState(1);
@@ -151,7 +283,8 @@ namespace db {
         int frameCount = 0;
         while (window_.isOpen()) {
             float dt = clock_.restart().asSeconds();
-            inputManager_.clearJustPressedLatch();  // Clear previous frame's latch
+            inputManager_.clearJustPressedLatch();
+            inputManagerP2_.clearJustPressedLatch();
             processEvents();
             inputManager_.update();
             update(dt);
@@ -170,20 +303,14 @@ namespace db {
         float winW = static_cast<float>(winSize.x);
         float winH = static_cast<float>(winSize.y);
 
-        // UI View (1920x1080) — 保持比例填满窗口
-        float uiScaleW = winW / 1920.f;
-        float uiScaleH = winH / 1080.f;
-        float uiScale = std::min(uiScaleW, uiScaleH);
+        // UI View (1920x1080) — 铺满全窗口（拉伸适配）
         sf::View uiView(sf::FloatRect({0, 0}, {1920, 1080}));
-        uiView.setViewport(sf::FloatRect({{(1.f - uiScale / uiScaleW) / 2.f, (1.f - uiScale / uiScaleH) / 2.f}, {uiScale / uiScaleW, uiScale / uiScaleH}}));
+        uiView.setViewport(sf::FloatRect({0, 0}, {1, 1}));
         m_uiView = uiView;
 
-        // Game View (800x600) — letterbox
-        float gameScaleW = winW / 800.f;
-        float gameScaleH = winH / 600.f;
-        float gameScale = std::min(gameScaleW, gameScaleH);
-        sf::View gameView(sf::FloatRect({0, 0}, {800, 600}));
-        gameView.setViewport(sf::FloatRect({{(1.f - gameScale / gameScaleW) / 2.f, (1.f - gameScale / gameScaleH) / 2.f}, {gameScale / gameScaleW, gameScale / gameScaleH}}));
+        // Game View — 铺满全窗口，坐标空间用窗口实际大小
+        sf::View gameView(sf::FloatRect({0, 0}, {winW, winH}));
+        gameView.setViewport(sf::FloatRect({0, 0}, {1, 1}));
         m_gameView = gameView;
     }
 
@@ -196,22 +323,22 @@ namespace db {
             if (const auto* key = event->getIf<sf::Event::KeyPressed>()) {
                 if (key->code == sf::Keyboard::Key::Escape) {
                     if (m_fullscreen) {
-                        window_.create(sf::VideoMode({800, 600}), "DragonBall - Phase 6", sf::Style::Resize | sf::Style::Close);
+                        window_.create(sf::VideoMode({960, 540}), "DragonBall - Phase 6", sf::Style::Resize | sf::Style::Close);
                         window_.setVerticalSyncEnabled(true);
                         window_.setFramerateLimit(60);
                         m_fullscreen = false;
-                        updateViews({800, 600});
+                        updateViews({960, 540});
                     } else {
                         window_.close();
                     }
                 }
                 if (key->code == sf::Keyboard::Key::F11) {
                     if (m_fullscreen) {
-                        window_.create(sf::VideoMode({800, 600}), "DragonBall - Phase 6", sf::Style::Resize | sf::Style::Close);
+                        window_.create(sf::VideoMode({960, 540}), "DragonBall - Phase 6", sf::Style::Resize | sf::Style::Close);
                         window_.setVerticalSyncEnabled(true);
                         window_.setFramerateLimit(60);
                         m_fullscreen = false;
-                        updateViews({800, 600});
+                        updateViews({960, 540});
                     } else {
                         window_.create(sf::VideoMode::getDesktopMode(), "DragonBall - Phase 6", sf::State::Fullscreen);
                         window_.setVerticalSyncEnabled(true);
@@ -230,58 +357,16 @@ namespace db {
                 // Event-based key tracking: prevents quick taps from being missed
                 inputManager_.onKeyPressed(key->code);
             }
+            if (const auto* key = event->getIf<sf::Event::KeyReleased>()) {
+                inputManager_.onKeyReleased(key->code);
+            }
         }
     }
 
     void Game::update(float dt) {
-        // 0. 选人界面
-        if (m_gameState == GameState::SELECT) {
-            int cols = 2;
-            int rows = (static_cast<int>(m_availableChars.size()) + cols - 1) / cols;
-
-            // P1 控制 (WASD + J 确认)
-            if (m_selectPhase == 0) {
-                if (inputManager_.isKeyJustPressed(sf::Keyboard::Key::W)) {
-                    m_p1Choice = (m_p1Choice - cols + static_cast<int>(m_availableChars.size())) % m_availableChars.size();
-                }
-                if (inputManager_.isKeyJustPressed(sf::Keyboard::Key::S)) {
-                    m_p1Choice = (m_p1Choice + cols) % m_availableChars.size();
-                }
-                if (inputManager_.isKeyJustPressed(sf::Keyboard::Key::A)) {
-                    m_p1Choice = (m_p1Choice - 1 + static_cast<int>(m_availableChars.size())) % m_availableChars.size();
-                }
-                if (inputManager_.isKeyJustPressed(sf::Keyboard::Key::D)) {
-                    m_p1Choice = (m_p1Choice + 1) % m_availableChars.size();
-                }
-                if (inputManager_.isKeyJustPressed(sf::Keyboard::Key::J)) {
-                    m_selectPhase = 1;
-                    m_p2Choice = (m_p1Choice + 1) % m_availableChars.size();
-                    std::cout << "[Select] P1 chose " << m_availableChars[m_p1Choice].displayName << std::endl;
-                }
-            }
-
-            // P2 控制 (IJKL + Enter 确认)
-            if (m_selectPhase >= 1) {
-                if (inputManager_.isKeyJustPressed(sf::Keyboard::Key::I)) {
-                    m_p2Choice = (m_p2Choice - cols + static_cast<int>(m_availableChars.size())) % m_availableChars.size();
-                }
-                if (inputManager_.isKeyJustPressed(sf::Keyboard::Key::K)) {
-                    m_p2Choice = (m_p2Choice + cols) % m_availableChars.size();
-                }
-                if (inputManager_.isKeyJustPressed(sf::Keyboard::Key::J)) {
-                    m_p2Choice = (m_p2Choice - 1 + static_cast<int>(m_availableChars.size())) % m_availableChars.size();
-                }
-                if (inputManager_.isKeyJustPressed(sf::Keyboard::Key::L)) {
-                    m_p2Choice = (m_p2Choice + 1) % m_availableChars.size();
-                }
-                if (inputManager_.isKeyJustPressed(sf::Keyboard::Key::Enter)) {
-                    m_selectPhase = 2;
-                    std::cout << "[Select] P2 chose " << m_availableChars[m_p2Choice].displayName << std::endl;
-                    initFight(m_p1Choice, m_p2Choice);
-                }
-            }
-            return;
-        }
+        if (m_gameState == GameState::TITLE) { updateTitle(dt); return; }
+        if (m_gameState == GameState::SELECT) { updateSelect(dt); return; }
+        if (m_gameState == GameState::STAGE_SELECT) { updateStageSelect(dt); return; }
 
         // 0. 开场动画 (检测进入循环后切到 191 → 0 → FIGHT)
         if (m_gameState == GameState::INTRO) {
@@ -290,6 +375,7 @@ namespace db {
                 m_player->getCurrentStateNo() == 0 &&
                 m_dummy->getCurrentStateNo() == 0) {
                 m_gameState = GameState::FIGHT;
+                m_roundTimer = 0.f;
                 std::cout << "[FIGHT] Round " << m_roundNumber << std::endl;
             }
             // 安全兜底: 15 秒强制退出
@@ -300,8 +386,8 @@ namespace db {
                 m_gameState = GameState::FIGHT;
             }
         }
-        if (m_gameState == GameState::FIGHT && m_roundTimer > 0.f) {
-            m_roundTimer -= dt;
+        if (m_gameState == GameState::FIGHT) {
+            m_roundTimer += dt;
         }
 
         // HitStop 冻结 (HitShakeOver 由 Fighter::update 基于状态计时器管理)
@@ -764,6 +850,105 @@ namespace db {
             [](const Spark& s) { return s.done; }), m_sparks.end());
     }
 
+    void Game::updateTitle(float dt) {
+        // 按任意键进入选人
+        if (inputManager_.isKeyJustPressed(sf::Keyboard::Key::J) ||
+            inputManager_.isKeyJustPressed(sf::Keyboard::Key::Enter) ||
+            inputManager_.isKeyJustPressed(sf::Keyboard::Key::Space) ||
+            inputManager_.justPressed('x') || inputManager_.justPressed('y') ||
+            inputManager_.justPressed('z') || inputManager_.justPressed('a') ||
+            inputManager_.justPressed('b') || inputManager_.justPressed('c') ||
+            inputManager_.justPressed('s') ||
+            inputManager_.isKeyJustPressed(sf::Keyboard::Key::A) ||
+            inputManager_.isKeyJustPressed(sf::Keyboard::Key::D) ||
+            inputManager_.isKeyJustPressed(sf::Keyboard::Key::W) ||
+            inputManager_.isKeyJustPressed(sf::Keyboard::Key::S)) {
+            m_gameState = GameState::SELECT;
+            m_selectPhase = 0;
+            m_p1Choice = 0;
+            m_p2Choice = 0;
+        }
+    }
+
+    void Game::updateSelect(float dt) {
+        int n = static_cast<int>(m_availableChars.size());
+        if (n == 0) return;
+
+        // P1 选人 (A/D 切换, J 确认)
+        if (m_selectPhase == 0) {
+            int prev = m_p1Choice;
+            if (inputManager_.isKeyJustPressed(sf::Keyboard::Key::A) ||
+                inputManager_.isKeyJustPressed(sf::Keyboard::Key::Left)) {
+                m_p1Choice = (m_p1Choice - 1 + n) % n;
+            }
+            if (inputManager_.isKeyJustPressed(sf::Keyboard::Key::D) ||
+                inputManager_.isKeyJustPressed(sf::Keyboard::Key::Right)) {
+                m_p1Choice = (m_p1Choice + 1) % n;
+            }
+            if (m_p1Choice != prev) m_selectAnimPos = 0.f;
+            else m_selectAnimPos = std::min(m_selectAnimPos + dt * 8.f, 1.f);
+
+            if (inputManager_.isKeyJustPressed(sf::Keyboard::Key::J)) {
+                m_selectPhase = 1;
+                // P2 默认选 P1 没选的角色
+                for (int i = 0; i < n; i++) {
+                    if (i != m_p1Choice) { m_p2Choice = i; break; }
+                }
+                m_selectAnimPos = 0.f;
+                std::cout << "[Select] P1 chose " << m_availableChars[m_p1Choice].displayName << std::endl;
+            }
+        }
+        // P2 选人 (← → 切换, Enter 确认)
+        else if (m_selectPhase == 1) {
+            int prev = m_p2Choice;
+            if (inputManager_.isKeyJustPressed(sf::Keyboard::Key::Left)) {
+                do {
+                    m_p2Choice = (m_p2Choice - 1 + n) % n;
+                } while (m_p2Choice == m_p1Choice);
+            }
+            if (inputManager_.isKeyJustPressed(sf::Keyboard::Key::Right)) {
+                do {
+                    m_p2Choice = (m_p2Choice + 1) % n;
+                } while (m_p2Choice == m_p1Choice);
+            }
+            if (m_p2Choice != prev) m_selectAnimPos = 0.f;
+            else m_selectAnimPos = std::min(m_selectAnimPos + dt * 8.f, 1.f);
+
+            if (inputManager_.isKeyJustPressed(sf::Keyboard::Key::Enter)) {
+                m_selectPhase = 2;
+                std::cout << "[Select] P2 chose " << m_availableChars[m_p2Choice].displayName << std::endl;
+                m_gameState = GameState::STAGE_SELECT;
+                m_stageChoice = 0;
+                m_stageAnimPos = 1.f;
+            }
+        }
+    }
+
+    void Game::updateStageSelect(float dt) {
+        int n = static_cast<int>(m_availableStages.size());
+        if (n == 0) {
+            m_gameState = GameState::SELECT;
+            return;
+        }
+        int prev = m_stageChoice;
+        if (inputManager_.isKeyJustPressed(sf::Keyboard::Key::A) ||
+            inputManager_.isKeyJustPressed(sf::Keyboard::Key::Left)) {
+            m_stageChoice = (m_stageChoice - 1 + n) % n;
+        }
+        if (inputManager_.isKeyJustPressed(sf::Keyboard::Key::D) ||
+            inputManager_.isKeyJustPressed(sf::Keyboard::Key::Right)) {
+            m_stageChoice = (m_stageChoice + 1) % n;
+        }
+        if (m_stageChoice != prev) m_stageAnimPos = 0.f;
+        else m_stageAnimPos = std::min(m_stageAnimPos + dt * 8.f, 1.f);
+
+        if (inputManager_.isKeyJustPressed(sf::Keyboard::Key::J) ||
+            inputManager_.isKeyJustPressed(sf::Keyboard::Key::Enter)) {
+            std::cout << "[Stage] Chose " << m_availableStages[m_stageChoice].name << std::endl;
+            initFight(m_p1Choice, m_p2Choice, m_stageChoice);
+        }
+    }
+
     void Game::checkCombat() {
         if (!m_player || !m_dummy || m_dummy->isDead()) return;
         if (m_player->isHitConsumed()) {
@@ -959,7 +1144,7 @@ namespace db {
     void Game::clampFighterToStage(Fighter& fighter) {
         // M.U.G.E.N 标准舞台边界
         const float STAGE_LEFT = 0.f;
-        const float STAGE_RIGHT = 800.f;  // 匹配窗口宽度
+        const float STAGE_RIGHT = static_cast<float>(m_windowSize.x);
         const float STAGE_TOP = 0.f;
         sf::Vector2f pos = fighter.getPosition();
         sf::FloatRect pushBox = fighter.getPushBox();
@@ -974,8 +1159,14 @@ namespace db {
     }
 
     void Game::render() {
+        // UI 画面 (TITLE/SELECT/STAGE_SELECT) — 使用 1920x1080 UI View 直接渲染
+        if (m_gameState == GameState::TITLE) { renderTitle(); return; }
+        if (m_gameState == GameState::SELECT) { renderSelect(); return; }
+        if (m_gameState == GameState::STAGE_SELECT) { renderStageSelect(); return; }
+
+        // 战斗场景 (FIGHT/INTRO/KO)
         // 画面震动 (EnvShake)
-        sf::View shakeView = window_.getDefaultView();
+        sf::View shakeView = m_gameView;
         int totalShakeAmpl = 0;
         if (m_player && m_player->getShakeAmpl() > 0) totalShakeAmpl = m_player->getShakeAmpl();
         if (m_dummy && m_dummy->getShakeAmpl() > totalShakeAmpl) totalShakeAmpl = m_dummy->getShakeAmpl();
@@ -984,114 +1175,116 @@ namespace db {
             float offsetY = static_cast<float>((std::rand() % (totalShakeAmpl * 2 + 1)) - totalShakeAmpl);
             shakeView.move({offsetX, offsetY});
         }
-        // M-eM-+M-^EM-eM-^BM-^BM-hM-^UM-^LM-gM-^MM-^AM-gM-^]M-^M M-gM-^@M-^AM-eM-^HM-6M-fM-^@M-^AM-hM-^PM-^AM-hM-^LM-^B (800x600 letterbox)
-        if (m_gameState != GameState::SELECT) {
-            window_.setView(m_gameView);
-        } else {
-            window_.setView(m_uiView);
-        }
+        window_.setView(shakeView);
         window_.clear(sf::Color(30, 30, 50));
 
-        // M-iM-^@M-^IM-dM-:M-:M-gM-^UM-^LM-iM-^]M-"
-        if (m_gameState == GameState::SELECT) {
-            window_.setView(m_uiView);
-            // 背景
-            sf::RectangleShape bg({1920, 1080});
-            bg.setFillColor(sf::Color(20, 20, 40));
-            window_.draw(bg);
 
-            // 标题
-            sf::Text title(m_debugFont);
-            title.setString("SELECT YOUR FIGHTER");
-            title.setCharacterSize(48);
-            title.setFillColor(sf::Color::White);
-            title.setPosition({960, 60});
-            auto tb = title.getLocalBounds();
-            title.setOrigin({tb.size.x / 2, 0});
-            window_.draw(title);
 
-            // 角色网格
-            int n = static_cast<int>(m_availableChars.size());
-            int cols = 2;
-            int rows = (n + cols - 1) / cols;
-            float cellW = 350.f, cellH = 200.f;
-            float gridW = cols * cellW, gridH = rows * cellH;
-            float startX = (1920 - gridW) / 2 + cellW / 2;
-            float startY = (1080 - gridH) / 2 + cellH / 2;
 
-            for (int i = 0; i < n; i++) {
-                int row = i / cols, col = i % cols;
-                float cx = startX + col * cellW;
-                float cy = startY + row * cellH;
 
-                sf::RectangleShape card({cellW - 20, cellH - 20});
-                card.setOrigin({(cellW - 20) / 2, (cellH - 20) / 2});
-                card.setPosition({cx, cy});
 
-                // 选中高亮
-                bool p1Sel = (i == m_p1Choice);
-                bool p2Sel = (i == m_p2Choice && m_selectPhase >= 1);
-                if (p1Sel && p2Sel) {
-                    card.setFillColor(sf::Color(180, 80, 80));
-                    card.setOutlineThickness(4);
-                    card.setOutlineColor(sf::Color::White);
-                } else if (p1Sel) {
-                    card.setFillColor(sf::Color(60, 60, 180));
-                    card.setOutlineThickness(3);
-                    card.setOutlineColor(sf::Color(100, 150, 255));
-                } else if (p2Sel) {
-                    card.setFillColor(sf::Color(180, 60, 60));
-                    card.setOutlineThickness(3);
-                    card.setOutlineColor(sf::Color(255, 150, 100));
-                } else {
-                    card.setFillColor(sf::Color(50, 50, 80));
-                    card.setOutlineThickness(1);
-                    card.setOutlineColor(sf::Color(100, 100, 120));
-                }
-                window_.draw(card);
 
-                // 角色名
-                sf::Text charName(m_debugFont);
-                charName.setString(m_availableChars[i].displayName);
-                charName.setCharacterSize(28);
-                charName.setFillColor(sf::Color::White);
-                charName.setPosition({cx, cy + 10});
-                auto nb = charName.getLocalBounds();
-                charName.setOrigin({nb.size.x / 2, 0});
-                window_.draw(charName);
-            }
 
-            // 提示文字
-            sf::Text hint(m_debugFont);
-            if (m_selectPhase == 0) {
-                hint.setString("P1: WASD move, J confirm");
-            } else {
-                hint.setString("P2: IJKL move, Enter confirm");
-            }
-            hint.setCharacterSize(20);
-            hint.setFillColor(sf::Color(180, 180, 200));
-            hint.setPosition({960, 900});
-            tb = hint.getLocalBounds();
-            hint.setOrigin({tb.size.x / 2, 0});
-            window_.draw(hint);
 
-            // 选择状态
-            sf::Text status(m_debugFont);
-            status.setCharacterSize(20);
-            status.setPosition({960, 950});
-            if (m_selectPhase == 0) {
-                status.setString("Waiting for P1...");
-                status.setFillColor(sf::Color(100, 150, 255));
-            } else if (m_selectPhase == 1) {
-                status.setString("P1: " + m_availableChars[m_p1Choice].displayName + " | Waiting for P2...");
-                status.setFillColor(sf::Color(255, 150, 100));
-            }
-            tb = status.getLocalBounds();
-            status.setOrigin({tb.size.x / 2, 0});
-            window_.draw(status);
 
-            window_.display();
-            return;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        // 战斗场景背景
+        if (m_stageBg.getSize().x > 0 && (m_gameState == GameState::FIGHT || m_gameState == GameState::INTRO || m_gameState == GameState::KO)) {
+            sf::Sprite stageSpr(m_stageBg);
+            float sx = static_cast<float>(m_windowSize.x) / m_stageBg.getSize().x;
+            float sy = static_cast<float>(m_windowSize.y) / m_stageBg.getSize().y;
+            stageSpr.setScale({sx, sy});
+            window_.draw(stageSpr);
         }
 
         // Helper 按 sprpriority 排序 (让低优先级的画在底层)
@@ -1115,27 +1308,29 @@ namespace db {
             if (m_dummy) m_dummy->drawDebug(window_);
         }
 
-        // HUD 用默认视图 (不震动)
-        window_.setView(window_.getDefaultView());
+        // HUD 用游戏视图 (与战斗场景坐标一致)
+        window_.setView(m_gameView);
+        if (m_hudP2) m_hudP2->setPosition(static_cast<float>(m_windowSize.x) - 10.0f, 10.0f);
         if (m_hudP1) m_hudP1->draw(window_);
         if (m_hudP2) m_hudP2->draw(window_);
 
-        // 回合/比赛信息
-        if (m_player) {
-            char buf[32];
-            snprintf(buf, sizeof(buf), "Round %d", m_roundNumber);
-            sf::Text roundText(m_debugFont);
-            roundText.setString(buf);
-            roundText.setCharacterSize(24);
-            roundText.setFillColor(sf::Color::White);
-            sf::FloatRect tb2 = roundText.getLocalBounds();
-            roundText.setOrigin({tb2.position.x + tb2.size.x/2.f, tb2.position.y + tb2.size.y/2.f});
-            roundText.setPosition({400.f, 60.f});
-            window_.draw(roundText);
+        // 计时器
+        if (m_gameState == GameState::FIGHT) {
+            int remaining = std::max(0, 99 - static_cast<int>(m_roundTimer));
+            char buf[8];
+            snprintf(buf, sizeof(buf), "%d", remaining);
+            m_bitmapFont.drawText(window_, buf, {m_windowSize.x / 2.f + 2.f, 30}, 28, sf::Color::White, {0.5f, 0.5f});
         }
 
-        // 调试信息：显示当前状态、动画ID、命令状态
-        if (m_debugReady && m_player) {
+        // 回合信息 (显示在计时器下方)
+        if (m_player && (m_gameState == GameState::INTRO || m_gameState == GameState::FIGHT)) {
+            char buf[32];
+            snprintf(buf, sizeof(buf), "ROUND %d", m_roundNumber);
+            m_bitmapFont.drawText(window_, buf, {m_windowSize.x / 2.f, 58}, 24, sf::Color::White, {0.5f, 0.f});
+        }
+
+        // 调试信息：显示当前状态、动画ID、命令状态 (按下 F1 切换)
+        if (m_debugReady && m_player && Fighter::getShowDebug()) {
             int stateNo = m_player->getCurrentStateNo();
             int animId = m_player->getCurrentAnimId();
             int animElem = m_player->getCurrentAnimElem();
@@ -1187,7 +1382,7 @@ namespace db {
 
         // SuperPause 暗化效果
         if (m_superPauseDarken) {
-            sf::RectangleShape dark({800.f, 600.f});
+            sf::RectangleShape dark({static_cast<float>(m_windowSize.x), static_cast<float>(m_windowSize.y)});
             dark.setFillColor({0, 0, 0, 120});  // 半透明黑
             window_.draw(dark);
         }
@@ -1195,14 +1390,7 @@ namespace db {
         if (m_player && m_dummy) {
             // KO 文字
             if (m_gameState == GameState::KO) {
-                sf::Text koText(m_debugFont);
-                koText.setString("K.O.!");
-                koText.setCharacterSize(60);
-                koText.setFillColor(sf::Color::Red);
-                sf::FloatRect tb = koText.getLocalBounds();
-                koText.setOrigin({tb.position.x + tb.size.x/2.f, tb.position.y + tb.size.y/2.f});
-                koText.setPosition({400.f, 200.f});
-                window_.draw(koText);
+                m_bitmapFont.drawText(window_, "K.O.!", {m_windowSize.x / 2.f, m_windowSize.y / 2.f}, 80, sf::Color::Red, {0.5f, 0.5f});
             }
         }
 
@@ -1219,10 +1407,15 @@ namespace db {
         m_dummy->requestStateChange(5900);
         m_player->resetLife();
         m_dummy->resetLife();
+        m_player->setVelocityX(0.f);
+        m_player->setVelocityY(0.f);
+        m_dummy->setVelocityX(0.f);
+        m_dummy->setVelocityY(0.f);
         float p1Y = 480.f - static_cast<float>(m_player->getAnimationPlayer().getCurrentFrame().offset.y);
         float p2Y = 480.f - static_cast<float>(m_dummy->getAnimationPlayer().getCurrentFrame().offset.y);
-        m_player->setPosition(200.f, p1Y);
-        m_dummy->setPosition(600.f, p2Y);
+        float cx = static_cast<float>(m_windowSize.x) / 2.f;
+        m_player->setPosition(cx - 200.f, p1Y);
+        m_dummy->setPosition(cx + 200.f, p2Y);
         m_helpers.clear();
         m_sparks.clear();
         m_hitStopTimer = 0.f;
@@ -1230,4 +1423,198 @@ namespace db {
         m_superPauseDarken = false;
     }
 
+void Game::renderTitle() {
+    window_.clear(sf::Color::Black);
+    window_.setView(m_uiView);
+    sf::Sprite bg(m_texTitleBg);
+    if (m_texTitleBg.getSize().x > 0) {
+        float sx = 1920.f / m_texTitleBg.getSize().x;
+        float sy = 1080.f / m_texTitleBg.getSize().y;
+        bg.setScale({sx, sy});
+        window_.draw(bg);
+    }
+    m_bitmapFont.drawText(window_, "PRESS ENTER TO START", {960.f, 980.f}, 64, sf::Color::White, {0.5f, 0.f});
+    window_.display();
+}
+
+void Game::renderSelect() {
+    window_.clear(sf::Color::Black);
+    window_.setView(m_uiView);
+    sf::Sprite bg(m_texSelectBg);
+    if (m_texSelectBg.getSize().x > 0) {
+        bg.setScale({1920.f / m_texSelectBg.getSize().x, 1080.f / m_texSelectBg.getSize().y});
+        window_.draw(bg);
+    }
+
+    m_bitmapFont.drawText(window_, "SELECT YOUR FIGHTER", {960, 60}, 72, sf::Color::White, {0.5f, 0.f});
+
+    int n = static_cast<int>(m_availableChars.size());
+    float centerX = 960.f, centerY = 500.f + m_selectOffsetY;
+    float sideW = 140.f, sideH = 240.f;
+    float largeW = sideW + (320.f - sideW) * m_selectAnimPos;
+    float largeH = sideH + (500.f - sideH) * m_selectAnimPos;
+    float spacing = m_selectSpacing;
+
+    auto drawPortrait = [&](int idx, float offsetX, float maxW, float maxH) {
+        if (idx < 0 || idx >= n) return;
+        const auto& cd = m_availableChars[idx];
+        const auto& tex = cd.portraitLarge;
+        if (tex.getSize().x == 0) return;
+        float scale = std::min(maxW / tex.getSize().x, maxH / tex.getSize().y);
+        float sprW = tex.getSize().x * scale;
+        float sprH = tex.getSize().y * scale;
+        float xPos = centerX + offsetX - sprW / 2;
+        float yPos = centerY - sprH / 2;
+
+        sf::Sprite spr(tex);
+        spr.setScale({scale, scale});
+        spr.setPosition({xPos, yPos});
+        window_.draw(spr);
+
+        m_bitmapFont.drawText(window_, cd.displayName, {centerX + offsetX, yPos + sprH + 40}, 28, sf::Color::White, {0.5f, 0.f});
+    };
+
+    int centerIdx = (m_selectPhase == 0) ? m_p1Choice : m_p2Choice;
+    int leftIdx = (centerIdx - 1 + n) % n;
+    int rightIdx = (centerIdx + 1) % n;
+
+    drawPortrait(leftIdx, -spacing, sideW, sideH);
+    drawPortrait(rightIdx, spacing, sideW, sideH);
+    drawPortrait(centerIdx, 0, largeW, largeH);
+
+    // 发光框 — 放大包裹当前角色 (预计算尺寸供箭头使用)
+    float gScale = 1.f, glowW = 0.f, glowH = 0.f;
+    float pad = 60.f;
+    if (m_texCursorGlow.getSize().x > 0) {
+        glowW = static_cast<float>(m_texCursorGlow.getSize().x);
+        glowH = static_cast<float>(m_texCursorGlow.getSize().y);
+        gScale = std::max((largeW + pad) / glowW, (largeH + pad) / glowH);
+        sf::Sprite glow(m_texCursorGlow);
+        glow.setScale({gScale, gScale});
+        glow.setPosition({centerX - glowW * gScale / 2, centerY - glowH * gScale / 2});
+        window_.draw(glow);
+    }
+
+    // P1/P2 标签 — 放在角色框正上方
+    float tagScale = 2.f;
+    float tagY = centerY - glowH * gScale / 2 - m_texP1Tag.getSize().y * tagScale - 8.f;
+    if (m_texP1Tag.getSize().x > 0 && m_selectPhase == 0) {
+        sf::Sprite tag(m_texP1Tag);
+        tag.setScale({tagScale, tagScale});
+        tag.setPosition({centerX - m_texP1Tag.getSize().x * tagScale / 2, tagY});
+        window_.draw(tag);
+    }
+    if (m_texP2Tag.getSize().x > 0 && m_selectPhase >= 1) {
+        sf::Sprite tag(m_texP2Tag);
+        tag.setScale({tagScale, tagScale});
+        tag.setPosition({centerX - m_texP2Tag.getSize().x * tagScale / 2, tagY});
+        window_.draw(tag);
+    }
+
+    // 箭头 — 放在选中框两侧
+    float frameHalfW = glowW * gScale / 2;
+    if (m_texSelectArrowL.getSize().x > 0 && glowW > 0) {
+        sf::Sprite arrow(m_texSelectArrowL);
+        arrow.setPosition({centerX - frameHalfW - m_texSelectArrowL.getSize().x - 4, centerY - m_texSelectArrowL.getSize().y / 2});
+        window_.draw(arrow);
+    }
+    if (m_texSelectArrowR.getSize().x > 0 && glowW > 0) {
+        sf::Sprite arrow(m_texSelectArrowR);
+        arrow.setPosition({centerX + frameHalfW + 4, centerY - m_texSelectArrowR.getSize().y / 2});
+        window_.draw(arrow);
+    }
+
+    // 底部提示
+    if (m_selectPhase == 0) {
+        m_bitmapFont.drawText(window_, "PLAYER 1 - A/D SELECT  J CONFIRM", {960, 980}, 28, sf::Color{180,180,180}, {0.5f, 0.f});
+    } else {
+        m_bitmapFont.drawText(window_, "PLAYER 2 - LEFT/RIGHT SELECT  ENTER CONFIRM", {960, 980}, 28, sf::Color{180,180,180}, {0.5f, 0.f});
+    }
+    window_.display();
+}
+
+void Game::renderStageSelect() {
+    window_.clear(sf::Color::Black);
+    window_.setView(m_uiView);
+    sf::Sprite bg(m_texStageBg);
+    if (m_texStageBg.getSize().x > 0) {
+        bg.setScale({1920.f / m_texStageBg.getSize().x, 1080.f / m_texStageBg.getSize().y});
+        window_.draw(bg);
+    }
+
+    m_bitmapFont.drawText(window_, "SELECT STAGE", {960, 60}, 72, sf::Color::White, {0.5f, 0.f});
+
+    int n = static_cast<int>(m_availableStages.size());
+    float centerX = 960.f, centerY = 500.f;
+    float sideW = 200.f, sideH = 130.f;
+    float largeW = sideW + (560.f - sideW) * m_stageAnimPos;
+    float largeH = sideH + (380.f - sideH) * m_stageAnimPos;
+    float spacing = 420.f;
+    float framePadding = 24.f;
+
+    int centerIdx = m_stageChoice;
+    int leftIdx = (centerIdx - 1 + n) % n;
+    int rightIdx = (centerIdx + 1) % n;
+
+    auto drawPreview = [&](int idx, float offsetX, float w, float h) {
+        if (idx < 0 || idx >= n) return;
+        const auto& tex = m_availableStages[idx].preview;
+        if (tex.getSize().x == 0) return;
+        float scale = std::min(w / tex.getSize().x, h / tex.getSize().y);
+        float sw = tex.getSize().x * scale, sh = tex.getSize().y * scale;
+        sf::Sprite spr(tex);
+        spr.setScale({scale, scale});
+        spr.setPosition({centerX + offsetX - sw / 2, centerY - sh / 2});
+        window_.draw(spr);
+        m_bitmapFont.drawText(window_, m_availableStages[idx].name, {centerX + offsetX, centerY + h / 2 + 10}, 24, sf::Color::White, {0.5f, 0.f});
+    };
+
+    drawPreview(leftIdx, -spacing, sideW, sideH);
+    drawPreview(rightIdx, spacing, sideW, sideH);
+    drawPreview(centerIdx, 0, largeW, largeH);
+
+    // 两侧预览图的选择框
+    auto drawFrame = [&](float offsetX, float pw, float ph) {
+        if (m_texStageCursor.getSize().x == 0) return;
+        sf::Sprite cursor(m_texStageCursor);
+        float pad = 10.f;
+        float cs = std::max((pw + pad) / m_texStageCursor.getSize().x,
+                            (ph + pad) / m_texStageCursor.getSize().y);
+        cursor.setScale({cs, cs});
+        cursor.setPosition({centerX + offsetX - m_texStageCursor.getSize().x * cs / 2,
+                           centerY - m_texStageCursor.getSize().y * cs / 2});
+        window_.draw(cursor);
+    };
+    drawFrame(-spacing, sideW, sideH);
+    drawFrame(spacing, sideW, sideH);
+
+    // 中间选中框
+    if (m_texStageCursor.getSize().x > 0) {
+        sf::Sprite cursor(m_texStageCursor);
+        float cursorScale = std::max((largeW + framePadding) / m_texStageCursor.getSize().x,
+                                      (largeH + framePadding) / m_texStageCursor.getSize().y);
+        cursor.setScale({cursorScale, cursorScale});
+        float cw = m_texStageCursor.getSize().x * cursorScale;
+        float ch = m_texStageCursor.getSize().y * cursorScale;
+        cursor.setPosition({centerX - cw / 2, centerY - ch / 2});
+        window_.draw(cursor);
+    }
+
+    // 箭头放在选中框两侧
+    if (m_texStageArrowL.getSize().x > 0) {
+        sf::Sprite arrow(m_texStageArrowL);
+        float frameHalfW = (largeW + framePadding) / 2;
+        arrow.setPosition({centerX - frameHalfW - m_texStageArrowL.getSize().x - 2, centerY - m_texStageArrowL.getSize().y / 2});
+        window_.draw(arrow);
+    }
+    if (m_texStageArrowR.getSize().x > 0) {
+        sf::Sprite arrow(m_texStageArrowR);
+        float frameHalfW = (largeW + framePadding) / 2;
+        arrow.setPosition({centerX + frameHalfW + 2, centerY - m_texStageArrowR.getSize().y / 2});
+        window_.draw(arrow);
+    }
+
+    m_bitmapFont.drawText(window_, "LEFT/RIGHT SELECT  ENTER CONFIRM", {960, 980}, 28, sf::Color{180,180,180}, {0.5f, 0.f});
+    window_.display();
+}
 } // namespace db

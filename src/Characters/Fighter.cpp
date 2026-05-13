@@ -17,7 +17,7 @@ namespace {
 }
 
 namespace db {
-    bool Fighter::m_showDebug = true;
+    bool Fighter::m_showDebug = false;
     bool Fighter::m_showAnimDebug = false;
 
     Fighter::Fighter() : m_position(200.f, 480.f), m_velocity(0.f, 0.f), m_isGrounded(true) {
@@ -197,13 +197,15 @@ namespace db {
                       << " timer=0" << std::endl;
         }
 
-        // 回到待机时清理所有特效
+        // 回到待机时清理所有特效及残留速度
         if (stateNo == 0) {
             clearExplods();
             m_shakeTime = 0;
             m_shakeAmpl = 0;
             m_afterImageActive = false;
             m_afterImageGhosts.clear();
+            m_velocity.x = 0;
+            m_velocity.y = 0;
         }
 
         // 应用 CNS StateDef 属性 (type, physics, ctrl, velset, anim, poweradd, movetype)
