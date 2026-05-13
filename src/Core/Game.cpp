@@ -23,7 +23,7 @@ namespace db {
         }
     }
 
-    Game::Game() : window_(sf::VideoMode({800, 600}), "DragonBall - Phase 6") {
+    Game::Game() : window_(sf::VideoMode({800, 600}), "DragonBall - Phase 6", sf::Style::Resize | sf::Style::Close) {
         window_.setVerticalSyncEnabled(true);
         window_.setFramerateLimit(60);
         try {
@@ -165,11 +165,61 @@ namespace db {
         }
     }
 
+    void Game::updateViews(const sf::Vector2u& winSize) {
+        m_windowSize = winSize;
+        float winW = static_cast<float>(winSize.x);
+        float winH = static_cast<float>(winSize.y);
+
+        // UI View (1920x1080) — 保持比例填满窗口
+        float uiScaleW = winW / 1920.f;
+        float uiScaleH = winH / 1080.f;
+        float uiScale = std::min(uiScaleW, uiScaleH);
+        sf::View uiView(sf::FloatRect({0, 0}, {1920, 1080}));
+        uiView.setViewport(sf::FloatRect({{(1.f - uiScale / uiScaleW) / 2.f, (1.f - uiScale / uiScaleH) / 2.f}, {uiScale / uiScaleW, uiScale / uiScaleH}}));
+        m_uiView = uiView;
+
+        // Game View (800x600) — letterbox
+        float gameScaleW = winW / 800.f;
+        float gameScaleH = winH / 600.f;
+        float gameScale = std::min(gameScaleW, gameScaleH);
+        sf::View gameView(sf::FloatRect({0, 0}, {800, 600}));
+        gameView.setViewport(sf::FloatRect({{(1.f - gameScale / gameScaleW) / 2.f, (1.f - gameScale / gameScaleH) / 2.f}, {gameScale / gameScaleW, gameScale / gameScaleH}}));
+        m_gameView = gameView;
+    }
+
     void Game::processEvents() {
         while (const auto event = window_.pollEvent()) {
             if (event->is<sf::Event::Closed>()) window_.close();
+            if (const auto* size = event->getIf<sf::Event::Resized>()) {
+                updateViews({size->size.x, size->size.y});
+            }
             if (const auto* key = event->getIf<sf::Event::KeyPressed>()) {
-                if (key->code == sf::Keyboard::Key::Escape) window_.close();
+                if (key->code == sf::Keyboard::Key::Escape) {
+                    if (m_fullscreen) {
+                        window_.create(sf::VideoMode({800, 600}), "DragonBall - Phase 6", sf::Style::Resize | sf::Style::Close);
+                        window_.setVerticalSyncEnabled(true);
+                        window_.setFramerateLimit(60);
+                        m_fullscreen = false;
+                        updateViews({800, 600});
+                    } else {
+                        window_.close();
+                    }
+                }
+                if (key->code == sf::Keyboard::Key::F11) {
+                    if (m_fullscreen) {
+                        window_.create(sf::VideoMode({800, 600}), "DragonBall - Phase 6", sf::Style::Resize | sf::Style::Close);
+                        window_.setVerticalSyncEnabled(true);
+                        window_.setFramerateLimit(60);
+                        m_fullscreen = false;
+                        updateViews({800, 600});
+                    } else {
+                        window_.create(sf::VideoMode::getDesktopMode(), "DragonBall - Phase 6", sf::State::Fullscreen);
+                        window_.setVerticalSyncEnabled(true);
+                        window_.setFramerateLimit(60);
+                        m_fullscreen = true;
+                        updateViews(window_.getSize());
+                    }
+                }
                 if (key->code == sf::Keyboard::Key::F1) {
                     Fighter::setShowDebug(!Fighter::getShowDebug());
                 }
@@ -934,11 +984,15 @@ namespace db {
             float offsetY = static_cast<float>((std::rand() % (totalShakeAmpl * 2 + 1)) - totalShakeAmpl);
             shakeView.move({offsetX, offsetY});
         }
-        window_.setView(shakeView);
+        // M-eM-+M-^EM-eM-^BM-^BM-hM-^UM-^LM-gM-^MM-^AM-gM-^]M-^M M-gM-^@M-^AM-eM-^HM-6M-fM-^@M-^AM-hM-^PM-^AM-hM-^LM-^B (800x600 letterbox)
+        if (m_gameState != GameState::SELECT) {
+            window_.setView(m_gameView);
+        } else {
+            window_.setView(m_uiView);
+        }
+        window_.clear(sf::Color(30, 30, 50));
 
-        window_.clear(sf::Color(200, 200, 200));
-
-        // 选人界面
+        // M-iM-^@M-^IM-dM-:M-:M-gM-^UM-^LM-iM-^]M-"
         if (m_gameState == GameState::SELECT) {
             window_.setView(m_uiView);
             // 背景

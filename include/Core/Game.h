@@ -57,6 +57,7 @@ namespace db {
         void clampFighterToStage(Fighter& fighter);
         void spawnSpark(int animId, const sf::Vector2f& pos);
         void resetRound();
+        void updateViews(const sf::Vector2u& winSize);
 
         sf::RenderWindow window_;
         sf::Clock clock_;
@@ -103,6 +104,9 @@ namespace db {
         int m_p2Choice = 0;
         int m_selectPhase = 0;  // 0=P1选, 1=P2选, 2=准备开始
         sf::View m_uiView{sf::FloatRect({0, 0}, {1920, 1080})};
+        sf::View m_gameView{sf::FloatRect({0, 0}, {800, 600})};
+        sf::Vector2u m_windowSize{800, 600};
+        bool m_fullscreen = false;
 
         std::vector<Spark> m_sparks;
         std::vector<HelperEntity> m_helpers;

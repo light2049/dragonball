@@ -67,7 +67,8 @@
       "Bash(awk -F: '{print NR, $0}')",
       "Bash(awk -F: '{if\\(NR>=48 && NR<=65\\) printf \"%3d: %s\\\\n\", $1, $2}')",
       "Bash(sed -i '/^0\\\\t62\\\\t33\\\\t76\\\\t16\\\\t74\\\\t38\\\\t1\\\\tPCX/ i 0\\\\t61\\\\t32\\\\t71\\\\t16\\\\t69\\\\t38\\\\t1\\\\tPCX' \"D:/DragonBall/Data/Characters/Goku_MUI/sprite_database_Goku_MUI.txt\")",
-      "Bash(sed -i '/^0\\\\t67\\\\t28\\\\t56\\\\t16\\\\t55\\\\t42\\\\t1\\\\tPCX/ i 0\\\\t66\\\\t27\\\\t56\\\\t13\\\\t54\\\\t41\\\\t1\\\\tPCX' \"D:/DragonBall/Data/Characters/Goku_MUI/sprite_database_Goku_MUI.txt\")"
+      "Bash(sed -i '/^0\\\\t67\\\\t28\\\\t56\\\\t16\\\\t55\\\\t42\\\\t1\\\\tPCX/ i 0\\\\t66\\\\t27\\\\t56\\\\t13\\\\t54\\\\t41\\\\t1\\\\tPCX' \"D:/DragonBall/Data/Characters/Goku_MUI/sprite_database_Goku_MUI.txt\")",
+      "Bash(python3 *)"
     ]
   }
 }
