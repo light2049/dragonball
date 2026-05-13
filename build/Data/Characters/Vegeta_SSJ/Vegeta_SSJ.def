@@ -1,0 +1,25 @@
+;***************************************************************************;
+;******************* Created in Fighter Factory Ultimate *******************;
+;*******************      http://www.virtualltek.com     *******************;
+;***************************************************************************;
+
+[Info]
+name = "Vegeta_SSJ_SWL"
+displayname = "Vegeta"
+versiondate = 
+mugenversion = 1.0
+author = "Game Zip"
+pal.defaults = 1
+
+[Files]
+sprite = Vegeta_SSJ_SWL.sff
+anim = Vegeta_SSJ_SWL.air
+sound = Vegeta_SSJ_SWL.snd
+cmd = Vegeta_SSJ_SWL.cmd
+cns = Vegeta_SSJ_SWL.cns
+stcommon = common1.cns
+st = Vegeta_SSJ_SWL.cns
+
+[Arcade]
+intro.storyboard = 
+ending.storyboard = 

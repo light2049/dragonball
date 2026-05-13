@@ -1,0 +1,26 @@
+;***************************************************************************;
+;******************* Created in Fighter Factory Ultimate *******************;
+;*******************      http://www.virtualltek.com     *******************;
+;***************************************************************************;
+
+[Info]
+name ="Gogeta_SSB_ULSW"
+displayname ="Gogeta"
+versiondate =
+mugenversion =1.0
+author ="Game Zip"
+pal.defaults =1
+
+[Files]
+sprite =Gogeta_SSB_ULSW.sff
+anim =Gogeta_SSB_ULSW.air
+sound =Gogeta_SSB_ULSW.snd
+cmd =Gogeta_SSB_ULSW.cmd
+cns =Gogeta_SSB_ULSW.cns
+stcommon =common1.cns
+st =Gogeta_SSB_ULSW.cns
+pal1=Gogeta_SSB_ULSW.act
+
+[Arcade]
+intro.storyboard = 
+ending.storyboard = 
