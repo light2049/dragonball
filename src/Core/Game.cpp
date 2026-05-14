@@ -379,6 +379,18 @@ namespace db {
             return;
         }
 
+        // Fighter updates — run BEFORE superpause check so animation advances during pause
+        if (m_player) {
+            sf::Vector2f dummyPos = m_dummy ? m_dummy->getPosition() : sf::Vector2f(-9999.f, 0.f);
+            m_player->update(dt, inputManager_, dummyPos);
+        }
+
+        if (m_dummy) {
+            sf::Vector2f playerPos = m_player ? m_player->getPosition() : sf::Vector2f(-9999.f, 0.f);
+            m_dummy->update(dt, inputManagerP2_, playerPos);
+        }
+
+        // SuperPause — return early after fighter updates so only combat/post is skipped
         if (m_player && m_player->isInSuperPause()) {
             m_superPauseTimer = m_player->getSuperPauseTime();
             m_superPauseDarken = m_player->getSuperPauseDarken();
@@ -420,19 +432,6 @@ namespace db {
                     + " cmdA=" + std::to_string(cmdA) + " cmdB=" + std::to_string(cmdB) + " justB=" + std::to_string(justB)
                     + " cmdX=" + std::to_string(cmdX) + " dir=" + std::to_string(dirVal) + "\n").c_str());
             }
-        }
-
-        if (m_player) {
-            sf::Vector2f dummyPos = m_dummy ? m_dummy->getPosition() : sf::Vector2f(-9999.f, 0.f);
-            int oldState = m_player->getCurrentStateNo();
-            m_player->update(dt, inputManager_, dummyPos);
-
-            int newState = m_player->getCurrentStateNo();
-        }
-
-        if (m_dummy) {
-            sf::Vector2f playerPos = m_player->getPosition();
-            m_dummy->update(dt, inputManagerP2_, playerPos);
         }
 
         if (m_gameState == GameState::FIGHT && m_player && m_dummy) {
