@@ -3,17 +3,52 @@
 
 namespace db {
 
-    static sf::Keyboard::Key mapMugenButton(char btn) {
-        switch (btn) {
-            case 'x': return sf::Keyboard::Key::J;
-            case 'y': return sf::Keyboard::Key::I;
-            case 'z': return sf::Keyboard::Key::O;
-            case 'a': return sf::Keyboard::Key::K;
-            case 'b': return sf::Keyboard::Key::L;
-            case 'c': return sf::Keyboard::Key::U;
-            case 's': return sf::Keyboard::Key::Space;
-            default:  return sf::Keyboard::Key::Unknown;
-        }
+    // ========== KeyMapping presets ==========
+
+    KeyMapping KeyMapping::p1() {
+        return {{
+            /* BTN_X */ sf::Keyboard::Key::J,
+            /* BTN_Y */ sf::Keyboard::Key::I,
+            /* BTN_Z */ sf::Keyboard::Key::O,
+            /* BTN_A */ sf::Keyboard::Key::K,
+            /* BTN_B */ sf::Keyboard::Key::L,
+            /* BTN_C */ sf::Keyboard::Key::U,
+            /* BTN_S */ sf::Keyboard::Key::Space,
+        },{
+            /* DIR_U */ sf::Keyboard::Key::W,
+            /* DIR_D */ sf::Keyboard::Key::S,
+            /* DIR_L */ sf::Keyboard::Key::A,
+            /* DIR_R */ sf::Keyboard::Key::D,
+        }};
+    }
+
+    KeyMapping KeyMapping::p2() {
+        return {{
+            /* BTN_X */ sf::Keyboard::Key::Numpad1,
+            /* BTN_Y */ sf::Keyboard::Key::Numpad5,
+            /* BTN_Z */ sf::Keyboard::Key::Numpad6,
+            /* BTN_A */ sf::Keyboard::Key::Numpad2,
+            /* BTN_B */ sf::Keyboard::Key::Numpad3,
+            /* BTN_C */ sf::Keyboard::Key::Numpad4,
+            /* BTN_S */ sf::Keyboard::Key::Numpad0,
+        },{
+            /* DIR_U */ sf::Keyboard::Key::Up,
+            /* DIR_D */ sf::Keyboard::Key::Down,
+            /* DIR_L */ sf::Keyboard::Key::Left,
+            /* DIR_R */ sf::Keyboard::Key::Right,
+        }};
+    }
+
+    // ========== InputManager ==========
+
+    InputManager::InputManager()
+        : m_mapping(KeyMapping::p1()) {}
+
+    InputManager::InputManager(const KeyMapping& mapping)
+        : m_mapping(mapping) {}
+
+    void InputManager::setMapping(const KeyMapping& mapping) {
+        m_mapping = mapping;
     }
 
     void InputManager::onKeyPressed(sf::Keyboard::Key key) {
@@ -41,15 +76,15 @@ namespace db {
 
         FrameInput snap;
 
-        snap.x = eventKeyHeld(m_eventKeyState, mapMugenButton('x'));
-        snap.y = eventKeyHeld(m_eventKeyState, mapMugenButton('y'));
-        snap.z = eventKeyHeld(m_eventKeyState, mapMugenButton('z'));
-        snap.a = eventKeyHeld(m_eventKeyState, mapMugenButton('a'));
-        snap.b = eventKeyHeld(m_eventKeyState, mapMugenButton('b'));
-        snap.c = eventKeyHeld(m_eventKeyState, mapMugenButton('c'));
-        snap.s = eventKeyHeld(m_eventKeyState, mapMugenButton('s'));
+        snap.x = eventKeyHeld(m_eventKeyState, m_mapping.buttons[BTN_X]);
+        snap.y = eventKeyHeld(m_eventKeyState, m_mapping.buttons[BTN_Y]);
+        snap.z = eventKeyHeld(m_eventKeyState, m_mapping.buttons[BTN_Z]);
+        snap.a = eventKeyHeld(m_eventKeyState, m_mapping.buttons[BTN_A]);
+        snap.b = eventKeyHeld(m_eventKeyState, m_mapping.buttons[BTN_B]);
+        snap.c = eventKeyHeld(m_eventKeyState, m_mapping.buttons[BTN_C]);
+        snap.s = eventKeyHeld(m_eventKeyState, m_mapping.buttons[BTN_S]);
 
-        snap.charge = eventKeyHeld(m_eventKeyState, sf::Keyboard::Key::L) || snap.s;
+        snap.charge = snap.s;
 
         updateDirection(snap);
 
@@ -71,10 +106,10 @@ namespace db {
     }
 
     void InputManager::updateDirection(FrameInput& snap) {
-        bool up = eventKeyHeld(m_eventKeyState, sf::Keyboard::Key::W) || eventKeyHeld(m_eventKeyState, sf::Keyboard::Key::Up);
-        bool down = eventKeyHeld(m_eventKeyState, sf::Keyboard::Key::S) || eventKeyHeld(m_eventKeyState, sf::Keyboard::Key::Down);
-        bool left = eventKeyHeld(m_eventKeyState, sf::Keyboard::Key::A) || eventKeyHeld(m_eventKeyState, sf::Keyboard::Key::Left);
-        bool right = eventKeyHeld(m_eventKeyState, sf::Keyboard::Key::D) || eventKeyHeld(m_eventKeyState, sf::Keyboard::Key::Right);
+        bool up    = eventKeyHeld(m_eventKeyState, m_mapping.dirs[DIR_U]);
+        bool down  = eventKeyHeld(m_eventKeyState, m_mapping.dirs[DIR_D]);
+        bool left  = eventKeyHeld(m_eventKeyState, m_mapping.dirs[DIR_L]);
+        bool right = eventKeyHeld(m_eventKeyState, m_mapping.dirs[DIR_R]);
 
         if (up && right)       snap.dir = DirInput::UF;
         else if (up && left)   snap.dir = DirInput::UB;
@@ -99,15 +134,32 @@ namespace db {
         return sf::Keyboard::isKeyPressed(key);
     }
 
-    bool InputManager::justPressed(char btn) const {
+    sf::Keyboard::Key InputManager::keyForBtn(char btn) const {
         switch (btn) {
-            case 'x': return m_justPressedLatch[static_cast<int>(sf::Keyboard::Key::J)] || (m_current.x && !m_previous.x);
-            case 'y': return m_justPressedLatch[static_cast<int>(sf::Keyboard::Key::I)] || (m_current.y && !m_previous.y);
-            case 'z': return m_justPressedLatch[static_cast<int>(sf::Keyboard::Key::O)] || (m_current.z && !m_previous.z);
-            case 'a': return m_justPressedLatch[static_cast<int>(sf::Keyboard::Key::K)] || (m_current.a && !m_previous.a);
-            case 'b': return m_justPressedLatch[static_cast<int>(sf::Keyboard::Key::L)] || (m_current.b && !m_previous.b);
-            case 'c': return m_justPressedLatch[static_cast<int>(sf::Keyboard::Key::U)] || (m_current.c && !m_previous.c);
-            case 's': return m_justPressedLatch[static_cast<int>(sf::Keyboard::Key::Space)] || (m_current.s && !m_previous.s);
+            case 'x': return m_mapping.buttons[BTN_X];
+            case 'y': return m_mapping.buttons[BTN_Y];
+            case 'z': return m_mapping.buttons[BTN_Z];
+            case 'a': return m_mapping.buttons[BTN_A];
+            case 'b': return m_mapping.buttons[BTN_B];
+            case 'c': return m_mapping.buttons[BTN_C];
+            case 's': return m_mapping.buttons[BTN_S];
+            default:  return sf::Keyboard::Key::Unknown;
+        }
+    }
+
+    bool InputManager::justPressed(char btn) const {
+        sf::Keyboard::Key key = keyForBtn(btn);
+        int k = static_cast<int>(key);
+        bool latch = (k >= 0 && k < 128) ? m_justPressedLatch[k] : false;
+
+        switch (btn) {
+            case 'x': return latch || (m_current.x && !m_previous.x);
+            case 'y': return latch || (m_current.y && !m_previous.y);
+            case 'z': return latch || (m_current.z && !m_previous.z);
+            case 'a': return latch || (m_current.a && !m_previous.a);
+            case 'b': return latch || (m_current.b && !m_previous.b);
+            case 'c': return latch || (m_current.c && !m_previous.c);
+            case 's': return latch || (m_current.s && !m_previous.s);
             default:  return false;
         }
     }

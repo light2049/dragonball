@@ -274,6 +274,7 @@ namespace db {
             inputManagerP2_.clearJustPressedLatch();
             processEvents();
             inputManager_.update();
+            inputManagerP2_.update();
             update(dt);
             render();
 
@@ -340,10 +341,40 @@ namespace db {
                     std::cout << "[AnimDebug] " << (Fighter::getAnimDebug() ? "ON" : "OFF") << std::endl;
                 }
 
-                inputManager_.onKeyPressed(key->code);
+                auto routeKey = [&](sf::Keyboard::Key k) {
+                    if (k == sf::Keyboard::Key::Numpad1 || k == sf::Keyboard::Key::Numpad2 ||
+                        k == sf::Keyboard::Key::Numpad3 || k == sf::Keyboard::Key::Numpad4 ||
+                        k == sf::Keyboard::Key::Numpad5 || k == sf::Keyboard::Key::Numpad6 ||
+                        k == sf::Keyboard::Key::Numpad0 ||
+                        k == sf::Keyboard::Key::Up || k == sf::Keyboard::Key::Down ||
+                        k == sf::Keyboard::Key::Left || k == sf::Keyboard::Key::Right) {
+                        inputManagerP2_.onKeyPressed(k);
+                    } else if (k == sf::Keyboard::Key::Enter) {
+                        inputManager_.onKeyPressed(k);
+                        inputManagerP2_.onKeyPressed(k);
+                    } else {
+                        inputManager_.onKeyPressed(k);
+                    }
+                };
+                routeKey(key->code);
             }
             if (const auto* key = event->getIf<sf::Event::KeyReleased>()) {
-                inputManager_.onKeyReleased(key->code);
+                auto routeKey = [&](sf::Keyboard::Key k) {
+                    if (k == sf::Keyboard::Key::Numpad1 || k == sf::Keyboard::Key::Numpad2 ||
+                        k == sf::Keyboard::Key::Numpad3 || k == sf::Keyboard::Key::Numpad4 ||
+                        k == sf::Keyboard::Key::Numpad5 || k == sf::Keyboard::Key::Numpad6 ||
+                        k == sf::Keyboard::Key::Numpad0 ||
+                        k == sf::Keyboard::Key::Up || k == sf::Keyboard::Key::Down ||
+                        k == sf::Keyboard::Key::Left || k == sf::Keyboard::Key::Right) {
+                        inputManagerP2_.onKeyReleased(k);
+                    } else if (k == sf::Keyboard::Key::Enter) {
+                        inputManager_.onKeyReleased(k);
+                        inputManagerP2_.onKeyReleased(k);
+                    } else {
+                        inputManager_.onKeyReleased(k);
+                    }
+                };
+                routeKey(key->code);
             }
         }
     }
@@ -847,7 +878,8 @@ namespace db {
             if (m_p1Choice != prev) m_selectAnimPos = 0.f;
             else m_selectAnimPos = std::min(m_selectAnimPos + dt * 8.f, 1.f);
 
-            if (inputManager_.isKeyJustPressed(sf::Keyboard::Key::J)) {
+            if (inputManager_.isKeyJustPressed(sf::Keyboard::Key::J) ||
+                inputManager_.isKeyJustPressed(sf::Keyboard::Key::Enter)) {
                 m_selectPhase = 1;
 
                 for (int i = 0; i < n; i++) {
@@ -860,20 +892,23 @@ namespace db {
 
         else if (m_selectPhase == 1) {
             int prev = m_p2Choice;
-            if (inputManager_.isKeyJustPressed(sf::Keyboard::Key::Left)) {
-                do {
-                    m_p2Choice = (m_p2Choice - 1 + n) % n;
-                } while (m_p2Choice == m_p1Choice);
-            }
-            if (inputManager_.isKeyJustPressed(sf::Keyboard::Key::Right)) {
-                do {
-                    m_p2Choice = (m_p2Choice + 1) % n;
-                } while (m_p2Choice == m_p1Choice);
+            if (inputManagerP2_.isKeyJustPressed(sf::Keyboard::Key::Left) ||
+                inputManagerP2_.isKeyJustPressed(sf::Keyboard::Key::Right)) {
+                if (inputManagerP2_.isKeyJustPressed(sf::Keyboard::Key::Left)) {
+                    do {
+                        m_p2Choice = (m_p2Choice - 1 + n) % n;
+                    } while (m_p2Choice == m_p1Choice);
+                } else {
+                    do {
+                        m_p2Choice = (m_p2Choice + 1) % n;
+                    } while (m_p2Choice == m_p1Choice);
+                }
             }
             if (m_p2Choice != prev) m_selectAnimPos = 0.f;
             else m_selectAnimPos = std::min(m_selectAnimPos + dt * 8.f, 1.f);
 
-            if (inputManager_.isKeyJustPressed(sf::Keyboard::Key::Enter)) {
+            if (inputManagerP2_.isKeyJustPressed(sf::Keyboard::Key::Numpad0) ||
+                inputManagerP2_.isKeyJustPressed(sf::Keyboard::Key::Enter)) {
                 m_selectPhase = 2;
                 std::cout << "[Select] P2 chose " << m_availableChars[m_p2Choice].displayName << std::endl;
                 m_gameState = GameState::STAGE_SELECT;

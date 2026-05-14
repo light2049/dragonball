@@ -68,7 +68,7 @@ namespace db {
         sf::RenderWindow window_;
         sf::Clock clock_;
         InputManager inputManager_;
-        InputManager inputManagerP2_;
+        InputManager inputManagerP2_{KeyMapping::p2()};
         sf::Font m_debugFont;
         std::unique_ptr<sf::Text> m_debugText;
         bool m_debugReady = false;

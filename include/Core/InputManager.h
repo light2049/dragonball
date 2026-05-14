@@ -34,8 +34,24 @@ namespace db {
         bool charge = false;
     };
 
+    enum MugenBtn { BTN_X, BTN_Y, BTN_Z, BTN_A, BTN_B, BTN_C, BTN_S, BTN_COUNT };
+    enum DirKey  { DIR_U, DIR_D, DIR_L, DIR_R, DIR_COUNT };
+
+    struct KeyMapping {
+        sf::Keyboard::Key buttons[BTN_COUNT];
+        sf::Keyboard::Key dirs[DIR_COUNT];
+
+        static KeyMapping p1();
+        static KeyMapping p2();
+    };
+
     class InputManager {
     public:
+        InputManager();
+        explicit InputManager(const KeyMapping& mapping);
+
+        void setMapping(const KeyMapping& mapping);
+
         void update();
 
         void onKeyPressed(sf::Keyboard::Key key);
@@ -76,8 +92,11 @@ namespace db {
         void clearCommandResults() { m_commandResults.clear(); }
 
     private:
+        sf::Keyboard::Key keyForBtn(char btn) const;
         void updateDirection(FrameInput& snap);
         void pushHistory(const FrameInput& snap);
+
+        KeyMapping m_mapping;
 
         FrameInput m_current;
         FrameInput m_previous;
