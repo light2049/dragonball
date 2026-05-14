@@ -159,6 +159,7 @@ namespace db {
         loadTex(m_texStageArrowL,   "Data/UI/stage_select/arrow_left_simple_40x60.png");
         loadTex(m_texStageArrowR,   "Data/UI/stage_select/arrow_right_simple_40x60.png");
         loadTex(m_texStageCursor,   "Data/UI/stage_select/cursor.png");
+        loadTex(m_texMenuArrow,     "Data/UI/menu_arrow.png");
         std::cout << "[UI] Loaded textures.\n";
     }
 
@@ -846,21 +847,60 @@ namespace db {
 
     void Game::updateTitle(float dt) {
 
-        if (inputManager_.isKeyJustPressed(sf::Keyboard::Key::J) ||
-            inputManager_.isKeyJustPressed(sf::Keyboard::Key::Enter) ||
-            inputManager_.isKeyJustPressed(sf::Keyboard::Key::Space) ||
-            inputManager_.justPressed('x') || inputManager_.justPressed('y') ||
-            inputManager_.justPressed('z') || inputManager_.justPressed('a') ||
-            inputManager_.justPressed('b') || inputManager_.justPressed('c') ||
-            inputManager_.justPressed('s') ||
-            inputManager_.isKeyJustPressed(sf::Keyboard::Key::A) ||
-            inputManager_.isKeyJustPressed(sf::Keyboard::Key::D) ||
-            inputManager_.isKeyJustPressed(sf::Keyboard::Key::W) ||
-            inputManager_.isKeyJustPressed(sf::Keyboard::Key::S)) {
-            m_gameState = GameState::SELECT;
-            m_selectPhase = 0;
-            m_p1Choice = 0;
-            m_p2Choice = 0;
+        if (m_menuPhase == 0) {
+            // Title screen — any key opens menu
+            if (inputManager_.isKeyJustPressed(sf::Keyboard::Key::J) ||
+                inputManager_.isKeyJustPressed(sf::Keyboard::Key::Enter) ||
+                inputManager_.isKeyJustPressed(sf::Keyboard::Key::Space) ||
+                inputManager_.justPressed('x') || inputManager_.justPressed('y') ||
+                inputManager_.justPressed('z') || inputManager_.justPressed('a') ||
+                inputManager_.justPressed('b') || inputManager_.justPressed('c') ||
+                inputManager_.justPressed('s') ||
+                inputManager_.isKeyJustPressed(sf::Keyboard::Key::A) ||
+                inputManager_.isKeyJustPressed(sf::Keyboard::Key::D) ||
+                inputManager_.isKeyJustPressed(sf::Keyboard::Key::W) ||
+                inputManager_.isKeyJustPressed(sf::Keyboard::Key::S)) {
+                m_menuPhase = 1;
+                m_menuChoice = MenuChoice::SINGLE;
+            }
+        } else {
+            // Menu phase — navigate choices
+            if (inputManager_.isKeyJustPressed(sf::Keyboard::Key::W) ||
+                inputManager_.isKeyJustPressed(sf::Keyboard::Key::Up)) {
+                int c = static_cast<int>(m_menuChoice);
+                c = (c - 1 + 3) % 3;
+                m_menuChoice = static_cast<MenuChoice>(c);
+            }
+            if (inputManager_.isKeyJustPressed(sf::Keyboard::Key::S) ||
+                inputManager_.isKeyJustPressed(sf::Keyboard::Key::Down)) {
+                int c = static_cast<int>(m_menuChoice);
+                c = (c + 1) % 3;
+                m_menuChoice = static_cast<MenuChoice>(c);
+            }
+            if (inputManager_.isKeyJustPressed(sf::Keyboard::Key::J) ||
+                inputManager_.isKeyJustPressed(sf::Keyboard::Key::Enter)) {
+                switch (m_menuChoice) {
+                    case MenuChoice::SINGLE:
+                        m_gameMode = GameMode::VS_AI;
+                        m_gameState = GameState::SELECT;
+                        m_selectPhase = 0;
+                        m_p1Choice = 0;
+                        m_p2Choice = 0;
+                        m_menuPhase = 0;
+                        break;
+                    case MenuChoice::VS:
+                        m_gameMode = GameMode::VS_PLAYER;
+                        m_gameState = GameState::SELECT;
+                        m_selectPhase = 0;
+                        m_p1Choice = 0;
+                        m_p2Choice = 0;
+                        m_menuPhase = 0;
+                        break;
+                    case MenuChoice::EXIT:
+                        window_.close();
+                        break;
+                }
+            }
         }
     }
 
@@ -883,13 +923,25 @@ namespace db {
 
             if (inputManager_.isKeyJustPressed(sf::Keyboard::Key::J) ||
                 inputManager_.isKeyJustPressed(sf::Keyboard::Key::Enter)) {
-                m_selectPhase = 1;
 
-                for (int i = 0; i < n; i++) {
-                    if (i != m_p1Choice) { m_p2Choice = i; break; }
+                if (m_gameMode == GameMode::VS_AI) {
+                    // VS AI: auto-pick opponent, skip to stage select
+                    for (int i = 0; i < n; i++) {
+                        if (i != m_p1Choice) { m_p2Choice = i; break; }
+                    }
+                    std::cout << "[Select] P1 chose " << m_availableChars[m_p1Choice].displayName << std::endl;
+                    m_gameState = GameState::STAGE_SELECT;
+                    m_stageChoice = 0;
+                    m_stageAnimPos = 1.f;
+                } else {
+                    // VS Player: P2 picks next
+                    m_selectPhase = 1;
+                    for (int i = 0; i < n; i++) {
+                        if (i != m_p1Choice) { m_p2Choice = i; break; }
+                    }
+                    m_selectAnimPos = 0.f;
+                    std::cout << "[Select] P1 chose " << m_availableChars[m_p1Choice].displayName << std::endl;
                 }
-                m_selectAnimPos = 0.f;
-                std::cout << "[Select] P1 chose " << m_availableChars[m_p1Choice].displayName << std::endl;
             }
         }
 
@@ -1296,7 +1348,25 @@ void Game::renderTitle() {
         bg.setScale({sx, sy});
         window_.draw(bg);
     }
-    m_bitmapFont.drawText(window_, "PRESS ENTER TO START", {960.f, 980.f}, 64, sf::Color::White, {0.5f, 0.f});
+    if (m_menuPhase == 0) {
+        m_bitmapFont.drawText(window_, "PRESS ENTER TO START", {960.f, 980.f}, 64, sf::Color::White, {0.5f, 0.f});
+    } else {
+        // Draw menu options
+        const char* labels[] = { "SINGLE PLAYER", "VS PLAYER", "EXIT" };
+        float menuY = m_menuOffsetY;
+        sf::Sprite arrow(m_texMenuArrow);
+        if (m_texMenuArrow.getSize().x > 0) {
+            int idx = static_cast<int>(m_menuChoice);
+            float arrowY = menuY + idx * 100.f - m_texMenuArrow.getSize().y / 2.f;
+            arrow.setPosition({800.f - m_texMenuArrow.getSize().x - 10.f, arrowY});
+            window_.draw(arrow);
+        }
+        for (int i = 0; i < 3; i++) {
+            m_bitmapFont.drawText(window_, labels[i], {820.f, menuY + i * 100.f},
+                                  48, sf::Color::White, {0.f, 0.5f});
+        }
+
+    }
     window_.display();
 }
 

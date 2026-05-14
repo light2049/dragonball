@@ -39,6 +39,9 @@ namespace db {
         DrawOverrides drawOverrides;
     };
 
+    enum class GameMode { VS_PLAYER, VS_AI };
+    enum class MenuChoice { SINGLE, VS, EXIT };
+
     class Game {
     public:
         Game();
@@ -126,6 +129,11 @@ namespace db {
         int m_stageChoice = 0;
         float m_stageAnimPos = 0.f;
 
+        GameMode m_gameMode = GameMode::VS_PLAYER;
+        int m_menuPhase = 0;
+        MenuChoice m_menuChoice = MenuChoice::SINGLE;
+        float m_menuOffsetY = 695.f;
+
         sf::Texture m_texTitleBg;
         sf::Texture m_texSelectBg;
         sf::Texture m_texSelectArrowL;
@@ -137,6 +145,7 @@ namespace db {
         sf::Texture m_texStageArrowL;
         sf::Texture m_texStageArrowR;
         sf::Texture m_texStageCursor;
+        sf::Texture m_texMenuArrow;
 
         sf::Texture m_stageBg;
 
