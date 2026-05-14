@@ -173,6 +173,7 @@ namespace db {
         m_currentStateNo = stateNo;
         m_stateTimer = -0.008f;
         m_hasHitCurrentAttack = false;
+        m_lastAnimElem = 0;
 
         if (m_showAnimDebug) {
             std::cout << "[StateChange] " << m_previousStateNo << " -> " << stateNo
@@ -577,6 +578,14 @@ namespace db {
         m_hasMoveContact = false;
 
         m_animationPlayer.update(dt);
+
+        {
+            int curElem = m_animationPlayer.getCurrentAnimElem();
+            if (curElem != m_lastAnimElem) {
+                m_lastAnimElem = curElem;
+                m_hitConsumed = false;
+            }
+        }
 
         if (m_showAnimDebug && m_currentStateNo != 0) {
             static int lastState = -1, lastAnim = -1, lastElem = -1;

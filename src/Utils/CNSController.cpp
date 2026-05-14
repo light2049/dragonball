@@ -1240,15 +1240,6 @@ namespace db {
         float addY = valueY;
         if (!valueXStr.empty()) addX = static_cast<float>(evaluateCNSExpression(valueXStr, fighter));
         if (!valueYStr.empty()) addY = static_cast<float>(evaluateCNSExpression(valueYStr, fighter));
-        if (fighter.getAnimDebug()) {
-            sf::Vector2f oppPos = fighter.getOpponentPos();
-            std::cout << "[PosAdd] x=" << addX << " y=" << addY
-                      << " myPos=(" << fighter.getPosition().x << "," << fighter.getPosition().y << ")"
-                      << " oppPos=(" << oppPos.x << "," << oppPos.y << ")"
-                      << " p2dist=(" << (oppPos.x - fighter.getPosition().x) << "," << (oppPos.y - fighter.getPosition().y) << ")"
-                      << " expr=\"" << valueXStr << "\""
-                      << std::endl;
-        }
         fighter.addPositionX(addX);
         fighter.addPositionY(addY);
     }
@@ -1653,6 +1644,9 @@ namespace db {
     void TransController::execute(Fighter& fighter, InputManager* inputMgr, float dt) const {
         auto& overrides = fighter.getDrawOverrides();
 
+        if (m_transType == "add" || m_transType == "add1" || m_transType == "addalpha") {
+            overrides.useAdditiveBlend = true;
+        }
         int src = std::max(0, std::min(256, m_alphaSrc));
         overrides.alpha = static_cast<uint8_t>((src * 255) / 256);
     }

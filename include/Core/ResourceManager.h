@@ -24,10 +24,9 @@ namespace db {
             // 检查缓存
             auto search = m_textures.find(path);
             if (search == m_textures.end()) {
-                // 没找到，加载它
                 std::unique_ptr<sf::Texture> texture = std::make_unique<sf::Texture>();
                 if (!texture->loadFromFile(path)) {
-                    throw std::runtime_error("无法加载图片: " + path);
+                    throw std::runtime_error("Unable to load: " + path);
                 }
                 m_textures[path] = std::move(texture);
             }

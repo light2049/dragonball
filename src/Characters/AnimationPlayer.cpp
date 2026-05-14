@@ -86,9 +86,7 @@ namespace db {
             m_sprite = std::make_unique<sf::Sprite>(texture);
             m_sprite->setScale({ (m_facingRight ? 1.0f : -1.0f) * m_scaleX, m_scaleY });
         } catch (const std::exception& e) {
-            std::cerr << "[AnimationPlayer] Texture load failed: " << e.what() << std::endl;
         } catch (...) {
-            std::cerr << "[AnimationPlayer] Texture load failed: unknown error" << std::endl;
         }
     }
 
@@ -134,9 +132,9 @@ namespace db {
 
         sf::RenderStates states;
         if (overrides && overrides->useAdditiveBlend) {
-            states.blendMode = sf::BlendAdd;
+            states.blendMode = sf::BlendMode(sf::BlendMode::Factor::SrcAlpha, sf::BlendMode::Factor::One);
         } else if (blendMode == BlendMode::Additive) {
-            states.blendMode = sf::BlendAdd;
+            states.blendMode = sf::BlendMode(sf::BlendMode::Factor::SrcAlpha, sf::BlendMode::Factor::One);
         } else if (blendMode == BlendMode::Subtractive) {
             states.blendMode = sf::BlendMode(sf::BlendMode::Factor::One, sf::BlendMode::Factor::One, sf::BlendMode::Equation::ReverseSubtract);
         }

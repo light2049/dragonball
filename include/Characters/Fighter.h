@@ -109,6 +109,7 @@ namespace db {
         sf::Vector2f getOpponentPos() const { return m_opponentPos; }
         sf::Vector2f getPrePhysicsPos() const { return m_prePhysicsPos; }
         void setRoundState(int s) { m_roundState = s; }
+        bool hasState(int stateNo) const { return m_stateRegistry.hasState(stateNo); }
         int getRoundState() const { return m_roundState; }
         void setRoundNo(int n) { m_roundNo = n; }
         int getRoundNo() const { return m_roundNo; }
@@ -348,7 +349,8 @@ namespace db {
 
         bool m_isAttacking = false;
         bool m_hasHitCurrentAttack = false;
-        bool m_hitConsumed = false; // 当前状态是否已命中过对手 (hitonce)
+        bool m_hitConsumed = false;
+        int m_lastAnimElem = 0;
         bool m_hasMoveContact = false; // ✅ 新增：记录本次攻击是否已命中/被防
         bool m_hasMoveHit = false;     // 是否实际命中 (非被防)
         bool m_hasMoveGuarded = false; // 是否被防御

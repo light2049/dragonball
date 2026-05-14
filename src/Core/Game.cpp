@@ -781,6 +781,8 @@ namespace db {
                                 }
                                 int src = std::max(0, std::min(256, alphaSrc));
                                 h.drawOverrides.alpha = static_cast<uint8_t>((src * 255) / 256);
+                                if (tc->m_transType == "add" || tc->m_transType == "add1" || tc->m_transType == "addalpha")
+                                    h.drawOverrides.useAdditiveBlend = true;
                             }
                             break;
                         }
@@ -1018,11 +1020,15 @@ namespace db {
             m_dummy->takeDamage(info.damage);
 
             int targetState = 5000;
-            {
+            if (info.p2stateno > 0 && m_dummy->hasState(info.p2stateno)) {
+                targetState = info.p2stateno;
+            } else {
                 std::string type = info.animtype;
                 if (type == "Light" || type == "light") targetState = 5000;
                 else if (type == "Medium" || type == "medium") targetState = 5001;
-                else targetState = 5002;
+                else if (type == "Hard" || type == "hard") targetState = 5002;
+                else targetState = 5000;
+                if (!m_dummy->hasState(targetState)) targetState = 5000;
             }
             m_dummy->requestStateChange(targetState);
 
