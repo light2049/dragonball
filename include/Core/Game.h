@@ -133,6 +133,7 @@ namespace db {
         int m_menuPhase = 0;
         MenuChoice m_menuChoice = MenuChoice::SINGLE;
         float m_menuOffsetY = 695.f;
+        float m_menuAnimPos = 1.f;
 
         sf::Texture m_texTitleBg;
         sf::Texture m_texSelectBg;
@@ -145,7 +146,8 @@ namespace db {
         sf::Texture m_texStageArrowL;
         sf::Texture m_texStageArrowR;
         sf::Texture m_texStageCursor;
-        sf::Texture m_texMenuArrow;
+        sf::Texture m_texMenuArrowL;
+        sf::Texture m_texMenuArrowR;
 
         sf::Texture m_stageBg;
 

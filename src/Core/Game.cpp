@@ -159,7 +159,8 @@ namespace db {
         loadTex(m_texStageArrowL,   "Data/UI/stage_select/arrow_left_simple_40x60.png");
         loadTex(m_texStageArrowR,   "Data/UI/stage_select/arrow_right_simple_40x60.png");
         loadTex(m_texStageCursor,   "Data/UI/stage_select/cursor.png");
-        loadTex(m_texMenuArrow,     "Data/UI/menu_arrow.png");
+        loadTex(m_texMenuArrowL,    "Data/UI/menu_arrow_left.png");
+        loadTex(m_texMenuArrowR,    "Data/UI/menu_arrow_right.png");
         std::cout << "[UI] Loaded textures.\n";
     }
 
@@ -865,6 +866,7 @@ namespace db {
             }
         } else {
             // Menu phase — navigate choices
+            MenuChoice prevChoice = m_menuChoice;
             if (inputManager_.isKeyJustPressed(sf::Keyboard::Key::W) ||
                 inputManager_.isKeyJustPressed(sf::Keyboard::Key::Up)) {
                 int c = static_cast<int>(m_menuChoice);
@@ -877,6 +879,8 @@ namespace db {
                 c = (c + 1) % 3;
                 m_menuChoice = static_cast<MenuChoice>(c);
             }
+            if (m_menuChoice != prevChoice) m_menuAnimPos = 0.f;
+            else m_menuAnimPos = std::min(m_menuAnimPos + dt * 8.f, 1.f);
             if (inputManager_.isKeyJustPressed(sf::Keyboard::Key::J) ||
                 inputManager_.isKeyJustPressed(sf::Keyboard::Key::Enter)) {
                 switch (m_menuChoice) {
@@ -1351,21 +1355,39 @@ void Game::renderTitle() {
     if (m_menuPhase == 0) {
         m_bitmapFont.drawText(window_, "PRESS ENTER TO START", {960.f, 980.f}, 64, sf::Color::White, {0.5f, 0.f});
     } else {
-        // Draw menu options
+        // Menu carousel: arrow fixed at center, options scroll vertically
         const char* labels[] = { "SINGLE PLAYER", "VS PLAYER", "EXIT" };
-        float menuY = m_menuOffsetY;
-        sf::Sprite arrow(m_texMenuArrow);
-        if (m_texMenuArrow.getSize().x > 0) {
-            int idx = static_cast<int>(m_menuChoice);
-            float arrowY = menuY + idx * 100.f - m_texMenuArrow.getSize().y / 2.f;
-            arrow.setPosition({800.f - m_texMenuArrow.getSize().x - 10.f, arrowY});
-            window_.draw(arrow);
-        }
+        int sel = static_cast<int>(m_menuChoice);
+        int prev = (sel - 1 + 3) % 3;
+        int next = (sel + 1) % 3;
+        float centerY = m_menuOffsetY;
+        float spacing = 80.f;
+        struct Slot { int idx; float yOff; float alpha; float fontSize; };
+        Slot slots[3] = {
+            {prev, centerY - spacing, 150.f, 32.f},
+            {sel,  centerY, 255.f, 24.f + m_menuAnimPos * 24.f},
+            {next, centerY + spacing, 150.f, 32.f},
+        };
         for (int i = 0; i < 3; i++) {
-            m_bitmapFont.drawText(window_, labels[i], {820.f, menuY + i * 100.f},
-                                  48, sf::Color::White, {0.f, 0.5f});
+            auto& s = slots[i];
+            sf::Color col{255, 255, 255, static_cast<uint8_t>(s.alpha)};
+            m_bitmapFont.drawText(window_, labels[s.idx], {960.f, s.yOff},
+                                  s.fontSize, col, {0.5f, 0.5f});
+            if (s.idx == sel) {
+                if (m_texMenuArrowL.getSize().x > 0) {
+                    sf::Sprite arrowL(m_texMenuArrowL);
+                    arrowL.setPosition({960.f - m_texMenuArrowL.getSize().x - 200.f,
+                                        s.yOff - m_texMenuArrowL.getSize().y / 2.f});
+                    window_.draw(arrowL);
+                }
+                if (m_texMenuArrowR.getSize().x > 0) {
+                    sf::Sprite arrowR(m_texMenuArrowR);
+                    arrowR.setPosition({960.f + 200.f,
+                                        s.yOff - m_texMenuArrowR.getSize().y / 2.f});
+                    window_.draw(arrowR);
+                }
+            }
         }
-
     }
     window_.display();
 }
