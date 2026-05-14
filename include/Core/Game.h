@@ -56,6 +56,7 @@ namespace db {
         void renderSelect();
         void renderStageSelect();
         void checkCombat();
+        void checkCombatBetween(Fighter& attacker, Fighter& defender);
         void handlePushCollision();
         void clampFighterToStage(Fighter& fighter);
         void spawnSpark(int animId, const sf::Vector2f& pos);

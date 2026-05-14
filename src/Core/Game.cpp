@@ -600,6 +600,9 @@ namespace db {
         if (m_player && m_player->isAttacking()) {
             m_player->executeCurrentStateCNS(nullptr, dt);
         }
+        if (m_dummy && m_dummy->isAttacking()) {
+            m_dummy->executeCurrentStateCNS(nullptr, dt);
+        }
 
         handlePushCollision();
         if (m_player) clampFighterToStage(*m_player);
@@ -944,29 +947,33 @@ namespace db {
     }
 
     void Game::checkCombat() {
-        if (!m_player || !m_dummy || m_dummy->isDead()) return;
-        if (m_player->isHitConsumed()) {
-            return;
-        }
-        const auto& hitDefs = m_player->getCurrentHitDefs();
-        if (hitDefs.empty()) {
-            return;
-        }
+        if (!m_player || !m_dummy) return;
+        // P1 → P2
+        checkCombatBetween(*m_player, *m_dummy);
+        // P2 → P1
+        checkCombatBetween(*m_dummy, *m_player);
+    }
+
+    void Game::checkCombatBetween(Fighter& attacker, Fighter& defender) {
+        if (defender.isDead()) return;
+        if (attacker.isHitConsumed()) return;
+        const auto& hitDefs = attacker.getCurrentHitDefs();
+        if (hitDefs.empty()) return;
 
         const auto& hit = hitDefs[0];
 
-        sf::FloatRect hitBox = m_player->getActiveHitbox();
-        sf::FloatRect hurtBox = m_dummy->getActiveHurtbox();
+        sf::FloatRect hitBox = attacker.getActiveHitbox();
+        sf::FloatRect hurtBox = defender.getActiveHurtbox();
 
         {
-            sf::Vector2f delta = m_player->getPrePhysicsPos() - m_player->getPosition();
+            sf::Vector2f delta = attacker.getPrePhysicsPos() - attacker.getPosition();
             hitBox.position.x += delta.x;
             hitBox.position.y += delta.y;
         }
 
         if (hitBox.size.x <= 0 || hitBox.size.y <= 0) {
             static int lastNoHitbox = -1;
-            int cs = m_player->getCurrentStateNo();
+            int cs = attacker.getCurrentStateNo();
             if (cs != lastNoHitbox) {
                 logMsg(("No hitbox state=" + std::to_string(cs) + "\n").c_str());
                 lastNoHitbox = cs;
@@ -978,21 +985,21 @@ namespace db {
         auto intersection = hitBox.findIntersection(hurtBox);
         if (!intersection.has_value()) {
             static int lastMissState = -1;
-            int cs = m_player->getCurrentStateNo();
+            int cs = attacker.getCurrentStateNo();
             if (cs != lastMissState) {
                 std::cout << "[CBmiss] state=" << cs
                           << " hitbox=(" << hitBox.position.x << "," << hitBox.position.y << " " << hitBox.size.x << "x" << hitBox.size.y << ")"
                           << " hurtbox=(" << hurtBox.position.x << "," << hurtBox.position.y << " " << hurtBox.size.x << "x" << hurtBox.size.y << ")"
-                          << " playerPos=(" << m_player->getPosition().x << "," << m_player->getPosition().y << ")"
-                          << " facing=" << (m_player->isFacingRight()?"R":"L")
+                          << " attackerPos=(" << attacker.getPosition().x << "," << attacker.getPosition().y << ")"
+                          << " facing=" << (attacker.isFacingRight()?"R":"L")
                           << std::endl;
                 lastMissState = cs;
             }
             return;
         }
 
-        std::cout << "[checkCombat] HIT! state=" << m_player->getCurrentStateNo() << std::endl;
-        m_player->setMoveContact(true);
+        std::cout << "[checkCombat] HIT! state=" << attacker.getCurrentStateNo() << std::endl;
+        attacker.setMoveContact(true);
 
         sf::Vector2f contactPoint(
             intersection->position.x + intersection->size.x / 2 + static_cast<float>(hit.sparkX),
@@ -1000,15 +1007,15 @@ namespace db {
         );
         spawnSpark(hit.sparkno, contactPoint);
 
-        bool isGuarding = m_dummy->isGuarding() && !(m_player->getAssertFlags() & 4);
+        bool isGuarding = defender.isGuarding() && !(attacker.getAssertFlags() & 4);
         if (isGuarding) {
-            m_player->setMoveGuarded(true);
+            attacker.setMoveGuarded(true);
         } else {
-            m_player->setMoveHit(true);
+            attacker.setMoveHit(true);
         }
-        m_player->setHitConsumed(true);
+        attacker.setHitConsumed(true);
 
-        std::string hitMsg = "HIT! state=" + std::to_string(m_player->getCurrentStateNo()) + "\n";
+        std::string hitMsg = "HIT! state=" + std::to_string(attacker.getCurrentStateNo()) + "\n";
         logMsg(hitMsg.c_str());
 
         HitInfo info;
@@ -1019,7 +1026,7 @@ namespace db {
         info.airHittime = (hit.airHittime > 0) ? hit.airHittime : 12;
 
         {
-            float hitDir = m_player->isFacingRight() ? 1.f : -1.f;
+            float hitDir = attacker.isFacingRight() ? 1.f : -1.f;
             info.groundVelocityX = hit.groundVelocityX * hitDir;
             info.airVelocityX = hit.airVelocityX * hitDir;
             info.airVelocityY = hit.airVelocityY;
@@ -1041,20 +1048,20 @@ namespace db {
         info.airType = hit.airType.empty() ? "High" : hit.airType;
         info.envshakeTime = hit.envshakeTime;
 
-        m_dummy->setHitInfo(info);
+        defender.setHitInfo(info);
 
         if (isGuarding) {
-            m_dummy->takeDamage(info.guardDamage);
-            m_dummy->requestStateChange(150);
+            defender.takeDamage(info.guardDamage);
+            defender.requestStateChange(150);
             if (hit.guardPausetime > 0) {
                 m_hitStopDuration = hit.guardPausetime;
                 m_hitStopTimer = hit.guardPausetime / 60.0f;
             }
         } else {
-            m_dummy->takeDamage(info.damage);
+            defender.takeDamage(info.damage);
 
             int targetState = 5000;
-            if (info.p2stateno > 0 && m_dummy->hasState(info.p2stateno)) {
+            if (info.p2stateno > 0 && defender.hasState(info.p2stateno)) {
                 targetState = info.p2stateno;
             } else {
                 std::string type = info.animtype;
@@ -1062,17 +1069,17 @@ namespace db {
                 else if (type == "Medium" || type == "medium") targetState = 5001;
                 else if (type == "Hard" || type == "hard") targetState = 5002;
                 else targetState = 5000;
-                if (!m_dummy->hasState(targetState)) targetState = 5000;
+                if (!defender.hasState(targetState)) targetState = 5000;
             }
-            m_dummy->requestStateChange(targetState);
+            defender.requestStateChange(targetState);
 
             if (info.p1stateno > 0) {
                 std::cout << "[Combo] p1stateno=" << info.p1stateno
-                          << " playerState=" << m_player->getCurrentStateNo() << std::endl;
-                m_player->requestStateChange(info.p1stateno);
+                          << " attackerState=" << attacker.getCurrentStateNo() << std::endl;
+                attacker.requestStateChange(info.p1stateno);
             }
 
-            m_dummy->setHitShakeOver(false);
+            defender.setHitShakeOver(false);
 
             if (hit.pausetime > 0) {
                 m_hitStopDuration = hit.pausetime;
@@ -1080,8 +1087,6 @@ namespace db {
             }
         }
 
-        if (m_hudP2) m_hudP2->update(m_dummy->getCurrentLife(), m_dummy->getMaxLife());
-        if (m_hudP2) m_hudP2->updatePower(m_dummy->getPower(), m_dummy->getMaxPower());
     }
 
     void Game::handlePushCollision() {
