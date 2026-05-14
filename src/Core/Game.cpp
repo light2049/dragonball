@@ -285,18 +285,18 @@ namespace db {
         }
     }
 
-    void Game::updateViews(const sf::Vector2u& winSize) {
-        m_windowSize = winSize;
-        float winW = static_cast<float>(winSize.x);
-        float winH = static_cast<float>(winSize.y);
-
+    void Game::updateViews(const sf::Vector2u& /*winSize*/) {
+        // UI view: fixed 1920x1080 logical coordinate space
         sf::View uiView(sf::FloatRect({0, 0}, {1920, 1080}));
         uiView.setViewport(sf::FloatRect({0, 0}, {1, 1}));
         m_uiView = uiView;
 
-        sf::View gameView(sf::FloatRect({0, 0}, {winW, winH}));
-        gameView.setViewport(sf::FloatRect({0, 0}, {1, 1}));
-        m_gameView = gameView;
+        // Game view: fixed 960x540 logical — SFML auto-scales to fill the window
+        // This ensures fullscreen mode scales up the original content proportionally
+        m_gameView = sf::View(sf::FloatRect({0, 0}, {960, 540}));
+        m_gameView.setViewport(sf::FloatRect({0, 0}, {1, 1}));
+
+        m_windowSize = {960, 540};
     }
 
     void Game::processEvents() {
