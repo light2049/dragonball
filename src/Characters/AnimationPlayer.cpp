@@ -97,17 +97,19 @@ namespace db {
 
         BlendMode blendMode = BlendMode::Normal;
         float axisX = 0.f, axisY = 0.f;
+        bool flipX = false;
         if (m_currentAnimation && m_currentFrameIndex < m_currentAnimation->frames.size()) {
             const auto& frame = m_currentAnimation->frames[m_currentFrameIndex];
             axisX = static_cast<float>(frame.axisX);
             axisY = static_cast<float>(frame.axisY);
             blendMode = frame.blendMode;
+            flipX = frame.flipX;
         }
 
         float extraScaleX = overrides ? overrides->scaleX : 1.f;
         float extraScaleY = overrides ? overrides->scaleY : 1.f;
 
-        float renderScaleX = (m_facingRight ? 1.0f : -1.0f) * m_scaleX * extraScaleX;
+        float renderScaleX = (m_facingRight ? 1.0f : -1.0f) * m_scaleX * extraScaleX * (flipX ? -1.f : 1.f);
         float finalX = position.x - axisX * renderScaleX;
         float finalY = position.y - axisY * m_scaleY * extraScaleY;
 
