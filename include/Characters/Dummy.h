@@ -7,7 +7,7 @@ namespace db {
     public:
         Dummy(float x, float y);
         void setTexture(const sf::Texture& tex);
-        void update(float dt); // ✅ 修改：需要传入时间 dt 来计算闪烁持续时间
+        void update(float dt);
         void takeDamage(int damage);
         void draw(sf::RenderWindow& window) const;
 
@@ -22,7 +22,6 @@ namespace db {
         std::unique_ptr<sf::Sprite> m_sprite;
         int m_currentLife;
         sf::FloatRect m_hurtBox;
-
-        float m_flashTimer = 0.0f; // ✅ 新增：受击闪烁计时器
+        float m_flashTimer = 0.0f;
     };
 }

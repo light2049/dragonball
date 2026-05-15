@@ -74,7 +74,12 @@
       "Bash(awk '{for\\(i=1;i<=length;i++\\){c=substr\\($0,i,1\\);if\\(c==\"{\"\\)op++;if\\(c==\"}\"\\)cl++}} END {print \"Opened:\",op,\"Closed:\",cl,\"Net:\",op-cl}')",
       "Bash(grep -n \"^        }$\" \"D:/DragonBall/src/Core/Game.cpp\")",
       "Bash(grep *)",
-      "Bash(python *)"
+      "Bash(python *)",
+      "Bash(cp \"D:/DragonBall/Data/UI/menu_arrow_left.png\" \"D:/DragonBall/build/Data/UI/menu_arrow_left.png\")",
+      "Bash(cp \"D:/DragonBall/Data/UI/menu_arrow_right.png\" \"D:/DragonBall/build/Data/UI/menu_arrow_right.png\")",
+      "Bash(file \"D:/DragonBall/Data/Characters/Goku_MUI/Sprites/Goku_MUI_0-\"*.png)",
+      "Bash(file *.png)",
+      "Bash(awk -F: '{ if \\($2 ~ /[0-9]+ x [0-9]+/\\) { split\\($2,a,/[x, ]/\\); if \\(a[1]+0 > 100 || a[3]+0 > 100\\) print $0; } }')"
     ]
   }
 }

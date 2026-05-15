@@ -7,9 +7,6 @@
 
 namespace db {
 
-    // ==========================================
-    // 数据结构定义
-    // ==========================================
 
     struct ClsnRect {
         sf::Vector2i topLeft;
@@ -20,7 +17,6 @@ namespace db {
         sf::FloatRect toLocalRect() const {
             float left = static_cast<float>(std::min(topLeft.x, bottomRight.x));
             float top = static_cast<float>(std::min(topLeft.y, bottomRight.y));
-            // SFML 3 语法：使用 {位置向量, 大小向量}
             return sf::FloatRect({left, top}, {static_cast<float>(getWidth()), static_cast<float>(getHeight())});
         }
     };
@@ -57,9 +53,6 @@ namespace db {
         size_t getFrameCount() const { return frames.size(); }
     };
 
-    // ==========================================
-    // 解析器类 (仅暴露 parse 接口)
-    // ==========================================
     class AirParser {
     public:
         static std::map<int, Animation> parse(const std::string& filePath,

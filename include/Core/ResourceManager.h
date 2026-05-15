@@ -24,9 +24,14 @@ namespace db {
             // 检查缓存
             auto search = m_textures.find(path);
             if (search == m_textures.end()) {
-                std::unique_ptr<sf::Texture> texture = std::make_unique<sf::Texture>();
-                if (!texture->loadFromFile(path)) {
+                // 用 sf::Image 作为中间层加载，正确处理索引色 PNG 的 tRNS 透明通道
+                sf::Image img;
+                if (!img.loadFromFile(path)) {
                     throw std::runtime_error("Unable to load: " + path);
+                }
+                auto texture = std::make_unique<sf::Texture>();
+                if (!texture->loadFromImage(img)) {
+                    throw std::runtime_error("Unable to create texture from: " + path);
                 }
                 m_textures[path] = std::move(texture);
             }
