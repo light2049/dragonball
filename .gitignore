@@ -23,3 +23,4 @@ Thumbs.db
 
 # Claude config (local overrides)
 .claude/settings.local.json
+README.md
