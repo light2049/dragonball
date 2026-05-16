@@ -959,10 +959,16 @@ namespace db {
             bool isAi = (m_gameMode == GameMode::VS_AI);
             auto& im = isAi ? inputManager_ : inputManagerP2_;
 
+            auto navLeft = isAi ? sf::Keyboard::Key::A : sf::Keyboard::Key::Left;
+            auto navRight = isAi ? sf::Keyboard::Key::D : sf::Keyboard::Key::Right;
+
             int prev = m_p2Choice;
-            if (im.isKeyJustPressed(sf::Keyboard::Key::Left) ||
+            if (im.isKeyJustPressed(navLeft) ||
+                im.isKeyJustPressed(navRight) ||
+                im.isKeyJustPressed(sf::Keyboard::Key::Left) ||
                 im.isKeyJustPressed(sf::Keyboard::Key::Right)) {
-                if (im.isKeyJustPressed(sf::Keyboard::Key::Left)) {
+                bool goLeft = im.isKeyJustPressed(navLeft) || im.isKeyJustPressed(sf::Keyboard::Key::Left);
+                if (goLeft) {
                     do {
                         m_p2Choice = (m_p2Choice - 1 + n) % n;
                     } while (m_p2Choice == m_p1Choice);
