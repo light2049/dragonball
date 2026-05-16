@@ -1,0 +1,18 @@
+[Info]
+name="Gohan_SSJ2"
+displayname="Gohan"
+versiondate=
+mugenversion=1.0
+author="Game Zip"
+pal.defaults=1
+[Files]
+sprite=Gohan_SSJ2.sff
+sound=Gohan_SSJ2.snd
+anim=Gohan_SSJ2.air
+cmd=Gohan_SSJ2.cmd
+cns=Gohan_SSJ2.cns
+st=Gohan_SSJ2.cns
+stcommon=common1.cns
+[Arcade]
+intro.storyboard=
+ending.storyboard=

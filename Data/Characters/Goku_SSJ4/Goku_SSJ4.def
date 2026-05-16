@@ -1,0 +1,18 @@
+[Info]
+name="Goku_SSJ4"
+displayname="Goku"
+versiondate=
+mugenversion=1.0
+author="Game Zip"
+pal.defaults=1
+[Files]
+sprite=Goku_SSJ4.sff
+sound=Goku_SSJ4.snd
+anim=Goku_SSJ4.air
+cmd=Goku_SSJ4.cmd
+cns=Goku_SSJ4.cns
+st=Goku_SSJ4.cns
+stcommon=common1.cns
+[Arcade]
+intro.storyboard=
+ending.storyboard=

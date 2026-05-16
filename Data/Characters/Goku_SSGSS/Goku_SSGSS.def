@@ -1,0 +1,25 @@
+;***************************************************************************;
+;******************* Created in Fighter Factory Ultimate *******************;
+;*******************      http://www.virtualltek.com     *******************;
+;***************************************************************************;
+
+[Info]
+name = "Goku_SSGSS"
+displayname = "Goku"
+versiondate = 
+mugenversion = 1.0
+author = "Game Zip"
+pal.defaults = 1
+
+[Files]
+sprite = Goku_SSGSS.sff
+anim = Goku_SSGSS.air
+sound = Goku_SSGSS.snd
+cmd = Goku_SSGSS.cmd
+cns = Goku_SSGSS.cns
+stcommon = common1.cns
+st = Goku_SSGSS.cns
+
+[Arcade]
+intro.storyboard = 
+ending.storyboard = 
