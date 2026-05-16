@@ -91,6 +91,10 @@ namespace db {
         void setCommandResult(const std::string& name, bool active) { m_commandResults[name] = active; }
         void clearCommandResults() { m_commandResults.clear(); }
 
+        // AI 覆写：直接注入帧输入状态
+        void setAIInput(const FrameInput& fi) { m_aiInput = fi; m_aiOverride = true; }
+        void disableAI() { m_aiOverride = false; }
+
     private:
         sf::Keyboard::Key keyForBtn(char btn) const;
         void updateDirection(FrameInput& snap);
@@ -106,6 +110,10 @@ namespace db {
         bool m_justPressedLatch[128] = {};
 
         bool m_eventKeyState[128] = {};
+
+        // AI 覆写
+        bool m_aiOverride = false;
+        FrameInput m_aiInput;
     };
 
 }

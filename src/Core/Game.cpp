@@ -276,6 +276,12 @@ namespace db {
             inputManagerP2_.clearJustPressedLatch();
             processEvents();
             inputManager_.update();
+
+            if (m_gameMode == GameMode::VS_AI &&
+                (m_gameState == GameState::FIGHT || m_gameState == GameState::INTRO)) {
+                generateAIForP2();
+            }
+
             inputManagerP2_.update();
             update(dt);
             render();
@@ -500,6 +506,7 @@ namespace db {
                 if (p2KO) m_p1RoundsWon++;
                 if (m_p1RoundsWon >= 2 || m_p2RoundsWon >= 2) {
                     std::cout << "[MATCH] Player " << (m_p1RoundsWon >= 2 ? "1" : "2") << " wins!" << std::endl;
+                    inputManagerP2_.disableAI();
                     m_gameState = GameState::SELECT;
                     m_p1RoundsWon = 0;
                     m_p2RoundsWon = 0;
@@ -1000,6 +1007,68 @@ namespace db {
             std::cout << "[Stage] Chose " << m_availableStages[m_stageChoice].name << std::endl;
             initFight(m_p1Choice, m_p2Choice, m_stageChoice);
         }
+    }
+
+    void Game::generateAIForP2() {
+        if (!m_player || !m_dummy) return;
+
+        float dist = std::abs(m_player->getPosition().x - m_dummy->getPosition().x);
+        bool opponentOnLeft = m_player->getPosition().x < m_dummy->getPosition().x;
+        bool opponentAttacking = (m_player->getMoveType() == 1);
+        int myMoveType = m_dummy->getMoveType();
+
+        FrameInput aiIn = {};
+
+        if (myMoveType == 2) {
+            inputManagerP2_.setAIInput(aiIn);
+            return;
+        }
+
+        m_aiDecisionTimer--;
+
+        if (m_aiDecisionTimer <= 0) {
+            bool facingRight = m_dummy->isFacingRight();
+            bool opponentInFront = (facingRight && !opponentOnLeft) || (!facingRight && opponentOnLeft);
+            bool wantBlock = opponentAttacking && dist < 250.f;
+
+            if (wantBlock) {
+                aiIn.dir = opponentInFront ? DirInput::B : DirInput::F;
+                m_aiDecisionTimer = 5 + std::rand() % 10;
+            } else if (m_dummy->getPower() < m_dummy->getMaxPower() && dist > 200.f && std::rand() % 4 == 0) {
+                // 远距离时 25% 概率蓄气
+                aiIn.s = true;
+                m_aiDecisionTimer = 30 + std::rand() % 30;
+            } else if (dist < 120.f) {
+                // 近距离：攻击
+                int r = std::rand() % 100;
+                if (r < 40) {       // 40% 轻拳
+                    aiIn.x = true;
+                } else if (r < 65) { // 25% 轻脚
+                    aiIn.a = true;
+                } else if (r < 80) { // 15% 中拳
+                    aiIn.y = true;
+                } else {             // 20% 重拳/必杀
+                    aiIn.z = true;
+                }
+                aiIn.dir = opponentInFront ? DirInput::F : DirInput::B;
+                m_aiDecisionTimer = 8 + std::rand() % 12;
+            } else if (dist < 300.f) {
+                aiIn.dir = opponentInFront ? DirInput::F : DirInput::B;
+                if (std::rand() % 20 == 0) {
+                    aiIn.dir = opponentInFront ? DirInput::UF : DirInput::UB;
+                }
+                m_aiDecisionTimer = 10 + std::rand() % 15;
+            } else {
+                aiIn.dir = opponentInFront ? DirInput::F : DirInput::B;
+                m_aiDecisionTimer = 15 + std::rand() % 20;
+            }
+
+            m_aiDir = aiIn.dir;
+        } else {
+            aiIn.dir = m_aiDir;
+        }
+
+        inputManagerP2_.setAIInput(aiIn);
     }
 
     void Game::checkCombat() {

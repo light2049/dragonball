@@ -76,17 +76,22 @@ namespace db {
 
         FrameInput snap;
 
-        snap.x = eventKeyHeld(m_eventKeyState, m_mapping.buttons[BTN_X]);
-        snap.y = eventKeyHeld(m_eventKeyState, m_mapping.buttons[BTN_Y]);
-        snap.z = eventKeyHeld(m_eventKeyState, m_mapping.buttons[BTN_Z]);
-        snap.a = eventKeyHeld(m_eventKeyState, m_mapping.buttons[BTN_A]);
-        snap.b = eventKeyHeld(m_eventKeyState, m_mapping.buttons[BTN_B]);
-        snap.c = eventKeyHeld(m_eventKeyState, m_mapping.buttons[BTN_C]);
-        snap.s = eventKeyHeld(m_eventKeyState, m_mapping.buttons[BTN_S]);
+        if (m_aiOverride) {
+            // AI 覆写：直接使用注入的帧输入
+            snap = m_aiInput;
+        } else {
+            snap.x = eventKeyHeld(m_eventKeyState, m_mapping.buttons[BTN_X]);
+            snap.y = eventKeyHeld(m_eventKeyState, m_mapping.buttons[BTN_Y]);
+            snap.z = eventKeyHeld(m_eventKeyState, m_mapping.buttons[BTN_Z]);
+            snap.a = eventKeyHeld(m_eventKeyState, m_mapping.buttons[BTN_A]);
+            snap.b = eventKeyHeld(m_eventKeyState, m_mapping.buttons[BTN_B]);
+            snap.c = eventKeyHeld(m_eventKeyState, m_mapping.buttons[BTN_C]);
+            snap.s = eventKeyHeld(m_eventKeyState, m_mapping.buttons[BTN_S]);
 
-        snap.charge = snap.s;
+            snap.charge = snap.s;
 
-        updateDirection(snap);
+            updateDirection(snap);
+        }
 
         m_current = snap;
         pushHistory(snap);

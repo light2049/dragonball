@@ -60,6 +60,7 @@ namespace db {
         void renderStageSelect();
         void checkCombat();
         void checkCombatBetween(Fighter& attacker, Fighter& defender);
+        void generateAIForP2();
         void handlePushCollision();
         void clampFighterToStage(Fighter& fighter);
         void spawnSpark(int animId, const sf::Vector2f& pos);
@@ -134,6 +135,10 @@ namespace db {
         MenuChoice m_menuChoice = MenuChoice::SINGLE;
         float m_menuOffsetY = 695.f;
         float m_menuAnimPos = 1.f;
+
+        // AI 对手状态
+        int m_aiDecisionTimer = 0;
+        DirInput m_aiDir = DirInput::NONE;
 
         sf::Texture m_texTitleBg;
         sf::Texture m_texSelectBg;
