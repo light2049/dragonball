@@ -936,14 +936,13 @@ namespace db {
                 inputManager_.isKeyJustPressed(sf::Keyboard::Key::Enter)) {
 
                 if (m_gameMode == GameMode::VS_AI) {
-                    // VS AI: auto-pick opponent, skip to stage select
+                    // VS AI: P1 picks the opponent too
+                    m_selectPhase = 1;
                     for (int i = 0; i < n; i++) {
                         if (i != m_p1Choice) { m_p2Choice = i; break; }
                     }
+                    m_selectAnimPos = 0.f;
                     std::cout << "[Select] P1 chose " << m_availableChars[m_p1Choice].displayName << std::endl;
-                    m_gameState = GameState::STAGE_SELECT;
-                    m_stageChoice = 0;
-                    m_stageAnimPos = 1.f;
                 } else {
                     // VS Player: P2 picks next
                     m_selectPhase = 1;
@@ -957,10 +956,13 @@ namespace db {
         }
 
         else if (m_selectPhase == 1) {
+            bool isAi = (m_gameMode == GameMode::VS_AI);
+            auto& im = isAi ? inputManager_ : inputManagerP2_;
+
             int prev = m_p2Choice;
-            if (inputManagerP2_.isKeyJustPressed(sf::Keyboard::Key::Left) ||
-                inputManagerP2_.isKeyJustPressed(sf::Keyboard::Key::Right)) {
-                if (inputManagerP2_.isKeyJustPressed(sf::Keyboard::Key::Left)) {
+            if (im.isKeyJustPressed(sf::Keyboard::Key::Left) ||
+                im.isKeyJustPressed(sf::Keyboard::Key::Right)) {
+                if (im.isKeyJustPressed(sf::Keyboard::Key::Left)) {
                     do {
                         m_p2Choice = (m_p2Choice - 1 + n) % n;
                     } while (m_p2Choice == m_p1Choice);
@@ -973,8 +975,9 @@ namespace db {
             if (m_p2Choice != prev) m_selectAnimPos = 0.f;
             else m_selectAnimPos = std::min(m_selectAnimPos + dt * 8.f, 1.f);
 
-            if (inputManagerP2_.isKeyJustPressed(sf::Keyboard::Key::Numpad0) ||
-                inputManagerP2_.isKeyJustPressed(sf::Keyboard::Key::Enter)) {
+            sf::Keyboard::Key confirmKey = isAi ? sf::Keyboard::Key::J : sf::Keyboard::Key::Numpad0;
+            if (im.isKeyJustPressed(confirmKey) ||
+                im.isKeyJustPressed(sf::Keyboard::Key::Enter)) {
                 m_selectPhase = 2;
                 std::cout << "[Select] P2 chose " << m_availableChars[m_p2Choice].displayName << std::endl;
                 m_gameState = GameState::STAGE_SELECT;
@@ -1547,6 +1550,8 @@ void Game::renderSelect() {
 
     if (m_selectPhase == 0) {
         m_bitmapFont.drawText(window_, "PLAYER 1 - A/D SELECT  J CONFIRM", {960, 980}, 28, sf::Color{180,180,180}, {0.5f, 0.f});
+    } else if (m_gameMode == GameMode::VS_AI) {
+        m_bitmapFont.drawText(window_, "SELECT OPPONENT - A/D SELECT  J CONFIRM", {960, 980}, 28, sf::Color{180,180,180}, {0.5f, 0.f});
     } else {
         m_bitmapFont.drawText(window_, "PLAYER 2 - LEFT/RIGHT SELECT  ENTER CONFIRM", {960, 980}, 28, sf::Color{180,180,180}, {0.5f, 0.f});
     }
