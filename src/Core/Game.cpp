@@ -1318,7 +1318,7 @@ namespace db {
         if (m_hudP2) m_hudP2->draw(window_);
 
         if (m_gameState == GameState::FIGHT) {
-            int remaining = std::max(0, 99 - static_cast<int>(m_roundTimer));
+            int remaining = std::max(0, 180 - static_cast<int>(m_roundTimer));
             char buf[8];
             snprintf(buf, sizeof(buf), "%d", remaining);
             m_bitmapFont.drawText(window_, buf, {m_windowSize.x / 2.f + 2.f, 30}, 28, sf::Color::White, {0.5f, 0.5f});
