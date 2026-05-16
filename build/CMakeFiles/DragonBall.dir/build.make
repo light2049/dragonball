@@ -333,9 +333,9 @@ DragonBall.exe: CMakeFiles/DragonBall.dir/src/Utils/CmdParser.cpp.obj
 DragonBall.exe: CMakeFiles/DragonBall.dir/src/Utils/SFFDatabase.cpp.obj
 DragonBall.exe: CMakeFiles/DragonBall.dir/src/Core/StateRegistry.cpp.obj
 DragonBall.exe: CMakeFiles/DragonBall.dir/build.make
-DragonBall.exe: D:/SFML-3.0.2/lib/libsfml-graphics-d.a
-DragonBall.exe: D:/SFML-3.0.2/lib/libsfml-window-d.a
-DragonBall.exe: D:/SFML-3.0.2/lib/libsfml-system-d.a
+DragonBall.exe: D:/SFML-3.0.2/lib/libsfml-graphics.a
+DragonBall.exe: D:/SFML-3.0.2/lib/libsfml-window.a
+DragonBall.exe: D:/SFML-3.0.2/lib/libsfml-system.a
 DragonBall.exe: CMakeFiles/DragonBall.dir/linkLibs.rsp
 DragonBall.exe: CMakeFiles/DragonBall.dir/objects1.rsp
 DragonBall.exe: CMakeFiles/DragonBall.dir/link.txt
